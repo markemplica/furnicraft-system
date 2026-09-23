@@ -1,0 +1,5 @@
+@extends('layouts.app')
+@section('title','Reset password')
+@section('content')
+<div class="auth-layout compact"><section class="auth-story"><a class="guest-brand" href="{{ route('login') }}"><span class="brand-mark">F</span> FurniCraft</a><div><p class="section-kicker">Account recovery</p><h1>A short-lived code keeps the reset private.</h1><p>Codes expire after 15 minutes, work once, and are stored only as a secure hash.</p></div></section><section class="auth-panel"><h2>Request a reset code</h2><p class="text-muted">Enter the email on your FurniCraft account.</p><form method="POST" action="{{ route('password.email') }}" class="vstack gap-3">@csrf<div><label class="form-label" for="email">Email address</label><input class="form-control" id="email" type="email" name="email" value="{{ old('email') }}" required autofocus></div><button class="btn btn-primary btn-lg">Send code</button></form><p class="mt-4"><a href="{{ route('login') }}">Return to sign in</a></p></section></div>
+@endsection
