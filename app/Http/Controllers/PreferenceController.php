@@ -11,16 +11,20 @@ class PreferenceController extends Controller
     public function edit(Request $request)
     {
         $preference = $request->user()->preference;
+        $preferenceComplete = filled($preference?->furniture_type);
         $styles = FurnitureProduct::where('status', 'active')->distinct()->orderBy('style')->pluck('style');
+        $furnitureTypes = FurnitureProduct::recommendationTypes();
         $rooms = $request->user()->roomImages()->latest()->get();
         $selectedRoomId = $rooms->contains('id', $request->integer('room')) ? $request->integer('room') : null;
 
-        return view('preferences.edit', compact('preference', 'styles', 'rooms', 'selectedRoomId'));
+        return view('preferences.edit', compact('preference', 'preferenceComplete', 'styles', 'furnitureTypes', 'rooms', 'selectedRoomId'));
     }
 
     public function update(Request $request)
     {
+        $furnitureTypes = FurnitureProduct::recommendationTypes();
         $data = $request->validate([
+            'furniture_type' => ['required', 'string', Rule::in($furnitureTypes->all())],
             'budget_min' => ['required', 'numeric', 'min:0'],
             'budget_max' => ['required', 'numeric', 'gt:budget_min'],
             'style' => ['nullable', 'string', 'max:80'],
@@ -29,7 +33,22 @@ class PreferenceController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $request->user()->preference()->updateOrCreate([], $data);
+        $preference = $request->user()->preference()->updateOrCreate([], $data);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Preferences updated successfully.',
+                'preference' => $preference->only([
+                    'furniture_type',
+                    'budget_min',
+                    'budget_max',
+                    'style',
+                    'wood_type',
+                    'varnish_finish',
+                    'notes',
+                ]),
+            ]);
+        }
 
         return redirect()
             ->to(route('preferences.edit').'#room-preview')

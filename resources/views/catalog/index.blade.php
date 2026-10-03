@@ -2,6 +2,7 @@
 @section('title','Furniture catalog')
 @section('content')
 <header class="page-heading"><div><p class="section-kicker">The Lance collection</p><h1>Furniture made to live with.</h1><p>Explore by name, budget, style, wood, and finish—or let FurniCraft find the closest fit for your room.</p></div><a class="btn btn-primary" href="{{ route('preferences.edit') }}">Find my match</a></header>
+<p class="alert alert-light fc-alert">These are active catalog listings. FurniCraft does not track branch inventory; confirm physical stock and item readiness with your preferred branch.</p>
 <form method="GET" action="{{ route('catalog.index') }}" class="filter-panel">
     <div class="search-wrap mb-3"><label class="form-label" for="catalog-search">Smart search</label><input id="catalog-search" class="form-control form-control-lg" name="q" value="{{ request('q') }}" placeholder="Try “dinn”, cabinet, or modern" autocomplete="off" data-live-search data-endpoint="{{ route('catalog.search') }}" aria-describedby="search-help"><div id="search-help" class="form-text">Results appear as you type. Partial words are supported.</div><div class="search-results" data-search-results hidden></div></div>
     <div class="row g-2 align-items-end">

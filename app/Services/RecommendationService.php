@@ -16,9 +16,13 @@ class RecommendationService
 {
     public function __construct(private GeminiService $gemini) {}
 
-    public function generate(User $user, CustomerPreference $preference, ?RoomImage $roomImage = null): Recommendation
+    public function generate(User $user, CustomerPreference $preference, ?RoomImage $roomImage, string $furnitureType): Recommendation
     {
-        $products = FurnitureProduct::query()->where('status', 'active')->get();
+        $products = FurnitureProduct::query()->where('status', 'active')->get()
+            ->filter(fn (FurnitureProduct $product) => $product->recommendationType() === $furnitureType)
+            ->values();
+        $hasPriorSignals = Favorite::where('user_id', $user->id)->exists()
+            || Reservation::where('user_id', $user->id)->exists();
         $collaborative = $this->collaborativeScores($user, $products);
 
         $ranked = $products->map(function (FurnitureProduct $product) use ($preference, $collaborative) {
@@ -29,7 +33,7 @@ class RecommendationService
             return ['product' => $product, 'content' => $content, 'collaborative' => $collab, 'total' => $total];
         })->sortByDesc('total')->take(8)->values();
 
-        $ai = $this->gemini->recommendationSummary($preference->toArray(), $ranked->map(fn ($row) => [
+        $ai = $this->gemini->recommendationSummary(array_merge($preference->toArray(), ['furniture_type' => $furnitureType]), $ranked->map(fn ($row) => [
             'name' => $row['product']->name,
             'score' => $row['total'],
             'price' => $row['product']->price,
@@ -38,19 +42,24 @@ class RecommendationService
             'style' => $row['product']->style,
         ])->all());
 
-        return DB::transaction(function () use ($user, $preference, $roomImage, $ranked, $ai) {
+        return DB::transaction(function () use ($user, $preference, $roomImage, $furnitureType, $ranked, $ai, $hasPriorSignals) {
             $recommendation = Recommendation::create([
                 'user_id' => $user->id,
                 'customer_preference_id' => $preference->id,
                 'room_image_id' => $roomImage?->id,
+                'furniture_type' => $furnitureType,
                 'summary' => $ai['text'],
-                'algorithm_version' => 'hybrid-v1',
+                'algorithm_version' => 'hybrid-v2-type-filtered-82-18',
                 'gemini_used' => $ai['used'],
+                'is_cold_start' => ! $hasPriorSignals,
+                'content_weight' => 0.82,
+                'collaborative_weight' => 0.18,
             ]);
 
             foreach ($ranked as $index => $row) {
                 $product = $row['product'];
                 $reasons = collect([
+                    "is a {$furnitureType} from your selected furniture type",
                     $this->matches($preference->style, $product->style) ? "matches your {$product->style} style" : null,
                     $this->matches($preference->wood_type, $product->wood_type) ? "uses your preferred {$product->wood_type} wood" : null,
                     $this->matches($preference->varnish_finish, $product->varnish_finish) ? "has the {$product->varnish_finish} finish you selected" : null,
@@ -63,7 +72,7 @@ class RecommendationService
                     'collaborative_score' => $row['collaborative'],
                     'total_score' => $row['total'],
                     'position' => $index + 1,
-                    'explanation' => $reasons->isEmpty() ? 'This is the closest available catalog match based on your combined preferences.' : ucfirst($reasons->implode(', ')).'.',
+                    'explanation' => $reasons->isEmpty() ? 'This is the closest active catalog match based on your combined preferences; branch stock must be confirmed.' : ucfirst($reasons->implode(', ')).'.',
                 ]);
             }
 

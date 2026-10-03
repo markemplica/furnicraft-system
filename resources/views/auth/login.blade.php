@@ -23,7 +23,7 @@
             <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
         </form>
         <p class="mt-4 mb-0">New to FurniCraft? <a href="{{ route('register') }}">Create a customer account</a></p>
-        <div class="demo-credentials"><strong>Demo access</strong><br>Customer: demo@furnicraft.local / password<br>Admin: admin@furnicraft.local / password</div>
+        @unless(app()->environment('production'))<div class="demo-credentials"><strong>Demo access</strong><br>Customer: demo@furnicraft.local / password<br>Admin: admin@furnicraft.local / password</div>@endunless
     </section>
 </div>
 @endsection

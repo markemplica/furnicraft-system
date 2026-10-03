@@ -34,7 +34,7 @@ class AuthController extends Controller
         $redirect = (string) $request->input('redirect');
         $sameHost = filled($redirect) && parse_url($redirect, PHP_URL_HOST) === $request->getHost();
         $relativePath = str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//');
-        $fallback = $request->user()->isAdmin() ? route('admin.dashboard') : route('catalog.index');
+        $fallback = $request->user()->isAdmin() ? route('admin.dashboard') : route('home');
         $target = ($sameHost || $relativePath) ? $redirect : $fallback;
 
         return redirect()->intended($target)->with('success', 'Welcome back, '.$request->user()->name.'.');
@@ -56,6 +56,6 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login')->with('success', 'You have been signed out.');
+        return redirect()->route('home')->with('success', 'You have been signed out.');
     }
 }

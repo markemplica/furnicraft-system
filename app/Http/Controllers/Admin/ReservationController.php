@@ -38,7 +38,7 @@ class ReservationController extends Controller
                     'product' => $reservation->product->name,
                     'branch' => $reservation->branch,
                     'confirmed_at' => $reservation->confirmed_at?->toIso8601String(),
-                    'next_step' => 'visit_selected_branch',
+                    'next_step' => 'contact_branch_to_confirm_item_readiness',
                 ],
             ]);
             $reservation->user->notify(new ReservationConfirmedNotification($reservation));
@@ -47,6 +47,8 @@ class ReservationController extends Controller
             }
         }
 
-        return back()->with('success', "Reservation {$reservation->reference} is now {$reservation->status}.");
+        $statusMessage = $reservation->status === 'confirmed' ? 'request approved' : $reservation->status;
+
+        return back()->with('success', "Reservation {$reservation->reference} is now {$statusMessage}.");
     }
 }

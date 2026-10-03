@@ -12,7 +12,7 @@ class ReservationConfirmedNotification extends Notification implements ShouldQue
 {
     use Queueable;
 
-    public const SUBJECT = 'Reservation confirmed - you may visit your selected branch';
+    public const SUBJECT = 'Reservation request approved - confirm item readiness';
 
     public function __construct(public Reservation $reservation) {}
 
@@ -26,14 +26,14 @@ class ReservationConfirmedNotification extends Notification implements ShouldQue
         return (new MailMessage)
             ->subject(self::SUBJECT)
             ->greeting('Hello '.$notifiable->name.'!')
-            ->line('Good news! The owner has confirmed your FurniCraft reservation.')
+            ->line('Good news! Shop staff approved your FurniCraft reservation request.')
             ->line("Reservation reference: {$this->reservation->reference}")
             ->line("Furniture: {$this->reservation->product->name}")
             ->line("Selected branch: {$this->reservation->branch}")
-            ->line("You may now visit the {$this->reservation->branch} branch you selected as the most convenient location.")
-            ->line('Please bring your reservation reference and contact the branch before visiting to confirm its operating hours and item readiness.')
-            ->line('This is a reservation hold only. No payment has been collected through FurniCraft.')
-            ->action('View confirmed reservation', route('reservations.index'))
+            ->line('This approval confirms the request review only. FurniCraft does not track branch inventory, and this message does not guarantee that the item is physically in stock or ready.')
+            ->line("Contact the {$this->reservation->branch} branch before visiting to confirm physical availability, item readiness, and operating hours. Share your reservation reference: {$this->reservation->reference}.")
+            ->line('No purchase or payment has been made through FurniCraft.')
+            ->action('View reservation request', route('reservations.index'))
             ->salutation('Lance Furniture Shop');
     }
 }

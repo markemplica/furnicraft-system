@@ -68,6 +68,19 @@
                 </div>
             </form>
         </section>
+
+        <section class="panel mt-4 border-danger" aria-labelledby="delete-account-heading">
+            <p class="section-kicker mb-1 text-danger">Data controls</p>
+            <h2 id="delete-account-heading" class="h3">Delete your account and data</h2>
+            <p class="text-muted">This permanently deletes your profile, preferences, room photos, recommendations, favorites, and reservation history. Enter your password and type DELETE to confirm.</p>
+            <form method="POST" action="{{ route('profile.destroy') }}" class="row g-3">
+                @csrf
+                @method('DELETE')
+                <div class="col-md-6"><label class="form-label" for="delete_current_password">Current password</label><input class="form-control" id="delete_current_password" name="current_password" type="password" autocomplete="current-password" required></div>
+                <div class="col-md-6"><label class="form-label" for="confirm_account_deletion">Type DELETE to confirm</label><input class="form-control" id="confirm_account_deletion" name="confirm_account_deletion" required></div>
+                <div class="col-12"><button class="btn btn-danger" type="submit">Permanently delete account</button></div>
+            </form>
+        </section>
     </div>
 
     <aside class="col-lg-4">
@@ -81,6 +94,7 @@
             </dl>
         </div>
         <div class="alert alert-info fc-alert mt-4" role="note"><strong>Privacy reminder</strong><br>Never share your password or reset code. FurniCraft staff will not ask for them.</div>
+        <a href="{{ route('privacy-policy') }}">Read privacy information</a>
     </aside>
 </div>
 @endsection

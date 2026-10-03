@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class FurnitureProduct extends Model
 {
@@ -44,6 +45,26 @@ class FurnitureProduct extends Model
         }
 
         return asset('storage/'.$this->image_path);
+    }
+
+    public function recommendationType(): string
+    {
+        $category = strtolower($this->category);
+
+        foreach (['Door', 'Table', 'Chair', 'Bed', 'Cabinet'] as $type) {
+            if (str_contains($category, strtolower($type))) {
+                return $type;
+            }
+        }
+
+        return $this->category;
+    }
+
+    public static function recommendationTypes(): Collection
+    {
+        return static::where('status', 'active')->orderBy('category')->get()
+            ->map(fn (self $product) => $product->recommendationType())
+            ->unique()->sort()->values();
     }
 
     public function getRouteKeyName(): string

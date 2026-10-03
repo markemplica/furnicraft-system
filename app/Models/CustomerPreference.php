@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class CustomerPreference extends Model
 {
-    protected $fillable = ['user_id', 'budget_min', 'budget_max', 'style', 'wood_type', 'varnish_finish', 'room_width_m', 'room_depth_m', 'notes'];
+    protected $fillable = ['user_id', 'furniture_type', 'budget_min', 'budget_max', 'style', 'wood_type', 'varnish_finish', 'room_width_m', 'room_depth_m', 'notes'];
 
     protected function casts(): array
     {

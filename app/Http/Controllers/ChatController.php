@@ -15,8 +15,15 @@ class ChatController extends Controller
         $data = $request->validate(['message' => ['required', 'string', 'max:1000']]);
         ChatMessage::create(['user_id' => $request->user()->id, 'recommendation_id' => $recommendation->id, 'role' => 'user', 'message' => $data['message']]);
         $answer = $gemini->chat($recommendation->load('items.product'), $data['message']);
-        ChatMessage::create(['user_id' => $request->user()->id, 'recommendation_id' => $recommendation->id, 'role' => 'assistant', 'message' => $answer['text'], 'gemini_used' => $answer['used']]);
+        $source = $answer['source'] ?? ($answer['used'] ? 'gemini' : 'local-fallback');
+        ChatMessage::create(['user_id' => $request->user()->id, 'recommendation_id' => $recommendation->id, 'role' => 'assistant', 'message' => $answer['text'], 'gemini_used' => $answer['used'], 'ai_source' => $source]);
 
-        return back()->with('success', 'FurniCraft replied to your question.');
+        $notice = match ($source) {
+            'local-fallback' => 'Gemini is temporarily unavailable. FurniCraft replied using local catalog guidance.',
+            'catalog-rule' => 'FurniCraft replied using current catalog listings. Physical branch stock still needs confirmation.',
+            default => 'FurniCraft replied to your question.',
+        };
+
+        return back()->with('success', $notice);
     }
 }

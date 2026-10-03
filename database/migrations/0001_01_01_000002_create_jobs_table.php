@@ -1,4 +1,3 @@
-git add .
 <?php
 
 use Illuminate\Database\Migrations\Migration;

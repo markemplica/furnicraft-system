@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Recommendation extends Model
 {
-    protected $fillable = ['user_id', 'customer_preference_id', 'room_image_id', 'summary', 'algorithm_version', 'gemini_used'];
+    protected $fillable = ['user_id', 'customer_preference_id', 'room_image_id', 'furniture_type', 'summary', 'algorithm_version', 'gemini_used', 'is_cold_start', 'content_weight', 'collaborative_weight'];
 
     protected function casts(): array
     {
-        return ['gemini_used' => 'boolean'];
+        return ['gemini_used' => 'boolean', 'is_cold_start' => 'boolean', 'content_weight' => 'float', 'collaborative_weight' => 'float'];
     }
 
     public function user()
