@@ -13,11 +13,13 @@ class PreferenceController extends Controller
         $preference = $request->user()->preference;
         $preferenceComplete = filled($preference?->furniture_type);
         $styles = FurnitureProduct::where('status', 'active')->distinct()->orderBy('style')->pluck('style');
+        $woodTypes = FurnitureProduct::where('status', 'active')->distinct()->orderBy('wood_type')->pluck('wood_type');
+        $varnishFinishes = FurnitureProduct::where('status', 'active')->distinct()->orderBy('varnish_finish')->pluck('varnish_finish');
         $furnitureTypes = FurnitureProduct::recommendationTypes();
         $rooms = $request->user()->roomImages()->latest()->get();
         $selectedRoomId = $rooms->contains('id', $request->integer('room')) ? $request->integer('room') : null;
 
-        return view('preferences.edit', compact('preference', 'preferenceComplete', 'styles', 'furnitureTypes', 'rooms', 'selectedRoomId'));
+        return view('preferences.edit', compact('preference', 'preferenceComplete', 'styles', 'woodTypes', 'varnishFinishes', 'furnitureTypes', 'rooms', 'selectedRoomId'));
     }
 
     public function update(Request $request)
@@ -28,8 +30,8 @@ class PreferenceController extends Controller
             'budget_min' => ['required', 'numeric', 'min:0'],
             'budget_max' => ['required', 'numeric', 'gt:budget_min'],
             'style' => ['nullable', 'string', 'max:80'],
-            'wood_type' => ['nullable', Rule::in(['Gmelina', 'Mahogany'])],
-            'varnish_finish' => ['nullable', Rule::in(['Natural', 'Narra Look', 'Mahogany', 'Chocolate Brown'])],
+            'wood_type' => ['nullable', Rule::in(FurnitureProduct::where('status', 'active')->distinct()->pluck('wood_type')->all())],
+            'varnish_finish' => ['nullable', Rule::in(FurnitureProduct::where('status', 'active')->distinct()->pluck('varnish_finish')->all())],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 

@@ -91,13 +91,13 @@ class ExampleTest extends TestCase
         $this->assertTrue(Hash::check('new-password-456', $user->fresh()->password));
     }
 
-    public function test_seeded_catalog_contains_all_nine_supplied_images(): void
+    public function test_seeded_catalog_contains_all_supplied_catalog_images(): void
     {
         $this->seed();
 
-        $this->assertSame(9, FurnitureProduct::where('image_path', 'like', 'catalog:%')->count());
-        foreach (range(1, 9) as $number) {
-            $filename = sprintf('drive-%02d.png', $number);
+        $this->assertSame(14, FurnitureProduct::where('image_path', 'like', 'catalog:%')->count());
+        $filenames = array_merge(array_map(fn ($number) => sprintf('drive-%02d.png', $number), range(1, 9)), ['catalog-console.png', 'catalog-3-pad.png', 'catalog-piano-with-s.png', 'catalog-605.png', 'catalog-channel.png']);
+        foreach ($filenames as $filename) {
             $product = FurnitureProduct::where('image_path', 'catalog:'.$filename)->firstOrFail();
             $this->assertStringEndsWith('/images/catalog/'.$filename, $product->image_url);
         }
@@ -241,26 +241,26 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertSee('Step 3 · Your AI matches')
             ->assertSee('options selected for your room.')
-            ->assertSee('Original room / FurniCraft result')
-            ->assertSee('Placement validation.')
-            ->assertSee('data-recommendation-preview', false)
-            ->assertSee('role="slider"', false)
-            ->assertSee('Showing in room');
+            ->assertSee('Automatic 2D room preview')
+            ->assertSee('Download preview (PNG)')
+            ->assertSee('data-room-preview', false)
+            ->assertDontSee('role="slider"', false)
+            ->assertSee('See', false);
         $this->actingAs($user)->get(route('room.visualize', ['roomImage' => $room, 'recommendation' => $recommendation->id, 'product' => $product->id]))
             ->assertOk()
-            ->assertSee('Original room / FurniCraft result')
+            ->assertSee('Automatic 2D room preview')
             ->assertSee($product->name)
             ->assertDontSee('Show original')
             ->assertDontSee('Split view')
             ->assertDontSee('Show result')
-            ->assertSee('role="slider"', false)
-            ->assertSee('Placement validation.')
+            ->assertDontSee('role="slider"', false)
+            ->assertSee('Download preview (PNG)')
             ->assertDontSee('data-fit-room', false)
             ->assertDontSee('data-product-scale', false)
             ->assertDontSee('data-product-rotation', false)
             ->assertDontSee('data-product-picker', false)
-            ->assertSee('Preview, not a measurement guarantee.')
-            ->assertSee('Placement requires verification');
+            ->assertSee('Preview is an estimate, not a measurement.')
+            ->assertSee('Verify actual dimensions with Lance Furniture Shop before reserving.');
     }
 
     public function test_chatbot_reports_catalog_availability_and_unavailable_requests(): void
@@ -432,7 +432,7 @@ class ExampleTest extends TestCase
             ->assertSee($active->name)
             ->assertDontSee($inactive->name)
             ->assertDontSee('data-product-picker', false)
-            ->assertSee('Placement validation.');
+            ->assertSee('Download preview (PNG)');
 
         $this->actingAs($user)->get(route('room.visualize', ['roomImage' => $room, 'product' => $inactive->id]))
             ->assertNotFound();
@@ -476,6 +476,18 @@ class ExampleTest extends TestCase
                                 'reason' => 'Clear living area beside the main wall.',
                             ]],
                             'scene_confidence' => 'high',
+                            'vision_geometry' => [
+                                'image_quality' => ['usable' => true, 'issues' => []],
+                                'floor_polygon' => [[0.05, 0.4], [0.95, 0.4], [0.98, 0.95], [0.02, 0.95]],
+                                'walls' => [],
+                                'openings' => [],
+                                'horizon_y' => 0.38,
+                                'blocked_zones' => [],
+                                'existing_furniture' => [],
+                                'scale_clues' => [['object' => 'door', 'pixel_height' => 250, 'typical_real_cm' => 210, 'base_y' => 0.9, 'reliability' => 0.9]],
+                                'lighting' => ['brightness' => 0.7, 'warmth' => 0.5, 'light_from' => 'front'],
+                                'confidence' => 0.8,
+                            ],
                         ]),
                     ]]],
                 ]],
@@ -485,7 +497,7 @@ class ExampleTest extends TestCase
         $user = User::factory()->create();
         $this->product(['name' => 'Test Sala Set', 'slug' => 'test-sala-set', 'category' => 'Sala Set']);
         $this->actingAs($user)->post('/preferences', ['furniture_type' => 'Sala Set', 'budget_min' => 5000, 'budget_max' => 40000]);
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        $png = file_get_contents(base_path('tests/Fixtures/room-600.png'));
         $this->actingAs($user)->post('/room', [
             'room_image' => UploadedFile::fake()->createWithContent('estimated-room.png', $png),
             'gemini_consent' => true,
@@ -495,7 +507,7 @@ class ExampleTest extends TestCase
         $this->assertSame('3.80', $room->room_width_m);
         $this->assertSame('4.60', $room->room_depth_m);
         $this->assertSame('low', $room->analysis['dimension_confidence']);
-        $this->assertSame('Sala Set', $room->analysis['analyzed_furniture_type']);
+        $this->assertSame('all catalog furniture', $room->analysis['analyzed_furniture_type']);
         $this->assertEquals(52.0, $room->analysis['placement_x_percent']);
         $this->assertEquals(88.0, $room->analysis['placement_y_percent']);
         $this->assertEquals(68.0, $room->analysis['placement_width_percent']);
@@ -505,21 +517,51 @@ class ExampleTest extends TestCase
         $this->assertTrue($room->analysis['gemini_used']);
         $this->actingAs($user)->get(route('room.visualize', $room))
             ->assertOk()
-            ->assertSee('data-placement-x="72"', false)
-            ->assertSee('data-placement-y="89"', false)
-            ->assertSee('data-placement-width="39.8"', false)
-            ->assertSee('Placement validation.')
+            ->assertSee('data-room-preview', false)
+            ->assertSee('Download preview (PNG)')
             ->assertDontSee('data-fit-room', false)
             ->assertDontSee('data-product-scale', false);
         Http::assertSent(function (ClientRequest $request): bool {
-            $format = data_get($request->data(), 'generationConfig.responseFormat.text');
+            $config = $request->data()['generationConfig'] ?? [];
 
-            return data_get($format, 'mimeType') === 'application/json'
-                && data_get($format, 'schema.type') === 'object';
+            return data_get($config, 'responseMimeType') === 'application/json'
+                && data_get($config, 'responseJsonSchema.type') === 'object';
         });
         Http::assertSentCount(1);
     }
 
+    public function test_room_analysis_falls_back_to_local_guidance_when_gemini_rejects_the_request(): void
+    {
+        config(['services.gemini.key' => 'test-key', 'services.gemini.model' => 'gemini-test', 'services.gemini.fallback_model' => 'gemini-fallback-test']);
+        Queue::fake();
+        Storage::fake('public');
+        Http::fake(['*' => Http::response(['error' => ['message' => 'Invalid response format']], 400)]);
+
+        $user = User::factory()->create();
+        $this->product();
+        $this->actingAs($user)->post('/preferences', ['furniture_type' => 'Table', 'budget_min' => 5000, 'budget_max' => 40000]);
+        $png = file_get_contents(base_path('tests/Fixtures/room-600.png'));
+        $this->actingAs($user)->post('/room', [
+            'room_image' => UploadedFile::fake()->createWithContent('gemini-error-room.png', $png),
+            'room_width_m' => 3.5,
+            'room_depth_m' => 4.2,
+            'gemini_consent' => true,
+        ])->assertRedirect();
+
+        $room = $user->roomImages()->firstOrFail();
+        (new AnalyzeRoomImage($room->id, 'Table'))->handle(
+            app(GeminiService::class),
+            app(\App\Services\RoomPhotoService::class),
+            app(\App\Services\PrivacyAudit::class),
+            app(\App\Services\AiTelemetry::class),
+        );
+
+        $room->refresh();
+        $this->assertSame('fallback', $room->analysis_status);
+        $this->assertFalse($room->analysis['gemini_used']);
+        $this->assertStringContainsString('Local room guidance is being used', $room->analysis_error);
+        Http::assertSentCount(4);
+    }
     public function test_placement_service_selects_a_clear_floor_zone_for_a_sala_set(): void
     {
         $product = $this->product([
@@ -591,6 +633,80 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('right doorway', $placement['reason']);
     }
 
+    public function test_door_placement_uses_a_doorway_and_ignores_its_existing_door_leaf(): void
+    {
+        $door = $this->product([
+            'name' => 'Doorway Replacement Test',
+            'slug' => 'doorway-replacement-test',
+            'category' => 'Door',
+            'width_cm' => 90,
+            'depth_cm' => 12,
+        ]);
+        $analysis = [
+            'candidate_zones' => [[
+                'surface' => 'opening',
+                'anchor_x_percent' => 87.5,
+                'anchor_y_percent' => 69.5,
+                'max_width_percent' => 15,
+                'quad_percent' => [[80.5, 22.5], [94.5, 20.2], [94.5, 71.2], [80.5, 67.8]],
+                'suitable_types' => ['Door'],
+                'clearance_score' => 95,
+                'occlusion_score' => 5,
+                'confidence' => 'high',
+                'reason' => 'Existing framed opening into walk-in closet.',
+            ]],
+            'openings' => [
+                ['label' => 'window_left', 'polygon' => [[16, 24], [29, 28], [29, 52], [16, 52]]],
+                ['label' => 'closet_doorway', 'polygon' => [[80.5, 22.5], [94.5, 20.2], [94.5, 71.2], [80.5, 67.8]]],
+            ],
+            'obstacles' => [[
+                'label' => 'open_closet_door_leaf',
+                'polygon' => [[80.5, 25.5], [82.5, 26.5], [82.5, 67.5], [80.5, 67.5]],
+            ]],
+        ];
+
+        $placement = app(FurniturePlacementService::class)->forProduct($analysis, $door, 20.0, 10.0);
+
+        $this->assertTrue($placement['renderable']);
+        $this->assertSame('candidate-zone', $placement['source']);
+        $this->assertSame(87.5, $placement['x_percent']);
+        $this->assertStringContainsString('walk-in closet', $placement['reason']);
+        $this->assertStringNotContainsString('window', $placement['reason']);
+    }
+    public function test_door_placement_rejects_window_candidates_and_window_regions(): void
+    {
+        $door = $this->product([
+            'name' => 'Window Guard Test Door',
+            'slug' => 'window-guard-test-door',
+            'category' => 'Door',
+            'width_cm' => 90,
+            'depth_cm' => 12,
+        ]);
+        $analysis = [
+            'candidate_zones' => [[
+                'surface' => 'opening',
+                'anchor_x_percent' => 22,
+                'anchor_y_percent' => 52,
+                'max_width_percent' => 18,
+                'quad_percent' => [[16, 24], [29, 28], [29, 52], [16, 52]],
+                'suitable_types' => ['Door'],
+                'clearance_score' => 95,
+                'occlusion_score' => 0,
+                'confidence' => 'high',
+                'reason' => 'Aligned to the detected window_left frame.',
+            ]],
+            'openings' => [[
+                'label' => 'window_left',
+                'polygon' => [[16, 24], [29, 28], [29, 52], [16, 52]],
+            ]],
+        ];
+
+        $placement = app(FurniturePlacementService::class)->forProduct($analysis, $door, 4.0, 5.0);
+
+        $this->assertFalse($placement['renderable']);
+        $this->assertSame('no-opening', $placement['validation_status']);
+        $this->assertSame('placement-blocked', $placement['source']);
+    }
     public function test_placement_service_rejects_obstructed_zones_and_oversized_furniture(): void
     {
         $product = $this->product([
@@ -631,7 +747,7 @@ class ExampleTest extends TestCase
     {
         config(['services.gemini.key' => 'test-key', 'services.gemini.model' => 'gemini-test']);
         Storage::fake('public');
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        $png = file_get_contents(base_path('tests/Fixtures/room-600.png'));
         Storage::disk('public')->put('rooms/legacy-door-room.png', $png);
         Http::fake(['*' => Http::response([
             'candidates' => [[
@@ -740,7 +856,7 @@ class ExampleTest extends TestCase
     {
         config(['services.gemini.key' => 'test-key', 'services.gemini.image_model' => 'gemini-3.1-flash-image']);
         Storage::fake('public');
-        $image = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        $image = file_get_contents(base_path('tests/Fixtures/room-600.png'));
         Storage::disk('public')->put('rooms/input.png', $image);
         Storage::disk('public')->put('products/selected.png', $image);
         $product = $this->product(['image_path' => 'products/selected.png']);
@@ -779,7 +895,7 @@ class ExampleTest extends TestCase
         $user = User::factory()->create();
         $this->product();
         $this->actingAs($user)->post('/preferences', ['furniture_type' => 'Table', 'budget_min' => 5000, 'budget_max' => 40000]);
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        $png = file_get_contents(base_path('tests/Fixtures/room-600.png'));
         $response = $this->actingAs($user)->post('/room', ['room_image' => UploadedFile::fake()->createWithContent('room.png', $png), 'room_width_m' => 3.5, 'room_depth_m' => 4.2]);
         $room = $user->roomImages()->firstOrFail();
         $response->assertRedirect(route('room.visualize', $room));
@@ -798,7 +914,7 @@ class ExampleTest extends TestCase
         $user = User::factory()->create();
         $this->product();
         $this->actingAs($user)->post('/preferences', ['furniture_type' => 'Table', 'budget_min' => 5000, 'budget_max' => 40000]);
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        $png = file_get_contents(base_path('tests/Fixtures/room-600.png'));
 
         $this->actingAs($user)->post('/room', [
             'room_image' => UploadedFile::fake()->createWithContent('queued-room.png', $png),
@@ -826,7 +942,7 @@ class ExampleTest extends TestCase
         Storage::fake('public');
         $user = User::factory()->create();
         $this->product();
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+        $png = file_get_contents(base_path('tests/Fixtures/room-600.png'));
 
         $this->actingAs($user)->post('/room', [
             'room_image' => UploadedFile::fake()->createWithContent('room.png', $png),

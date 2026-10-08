@@ -32,7 +32,7 @@
     <ol>
         <li><strong>Define your space</strong><span>Add your budget, style, materials, measurements, and an optional room photo.</span></li>
         <li><strong>Review intelligent matches</strong><span>Compare ranked furniture with concise explanations and room-fit context.</span></li>
-        <li><strong>Preview and reserve</strong><span>Use the 2D room comparison, ask questions, then request a branch reservation.</span></li>
+        <li><strong>Preview and reserve</strong><span>Use the 2D room comparison, ask questions, then request a reservation from Lance Furniture Shop.</span></li>
     </ol>
 </section>
 @endsection

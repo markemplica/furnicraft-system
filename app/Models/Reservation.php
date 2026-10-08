@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Reservation extends Model
 {
-    protected $fillable = ['reference', 'user_id', 'furniture_product_id', 'recommendation_id', 'branch', 'notes', 'status', 'confirmed_at', 'confirmed_by'];
+    protected $fillable = ['reference', 'user_id', 'furniture_product_id', 'recommendation_id', 'branch', 'preferred_visit_at', 'expires_at', 'notes', 'status', 'decline_reason', 'cancellation_reason', 'confirmed_at', 'confirmed_by', 'item_ready_confirmed_at', 'reminder_sent_at', 'completed_at', 'no_show_at'];
 
     protected function casts(): array
     {
-        return ['confirmed_at' => 'datetime'];
+        return ['preferred_visit_at' => 'datetime', 'expires_at' => 'datetime', 'confirmed_at' => 'datetime', 'item_ready_confirmed_at' => 'datetime', 'reminder_sent_at' => 'datetime', 'completed_at' => 'datetime', 'no_show_at' => 'datetime'];
     }
 
     public function user()
@@ -33,3 +33,4 @@ class Reservation extends Model
         return $this->hasMany(ReservationTransaction::class);
     }
 }
+

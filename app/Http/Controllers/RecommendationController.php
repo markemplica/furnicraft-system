@@ -33,8 +33,8 @@ class RecommendationController extends Controller
                 ->withErrors(['room_image_id' => 'Room analysis is still running. Recommendations will be available as soon as it finishes.']);
         }
         $preference->update([
-            'room_width_m' => $room->room_width_m ?: $preference->room_width_m,
-            'room_depth_m' => $room->room_depth_m ?: $preference->room_depth_m,
+            'room_width_m' => $room->room_width_m,
+            'room_depth_m' => $room->room_depth_m,
         ]);
         $recommendation = $service->generate($request->user(), $preference, $room, $preference->furniture_type);
 

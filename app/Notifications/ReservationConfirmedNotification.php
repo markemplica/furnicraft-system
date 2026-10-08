@@ -29,11 +29,11 @@ class ReservationConfirmedNotification extends Notification implements ShouldQue
             ->line('Good news! Shop staff approved your FurniCraft reservation request.')
             ->line("Reservation reference: {$this->reservation->reference}")
             ->line("Furniture: {$this->reservation->product->name}")
-            ->line("Selected branch: {$this->reservation->branch}")
-            ->line('This approval confirms the request review only. FurniCraft does not track branch inventory, and this message does not guarantee that the item is physically in stock or ready.')
-            ->line("Contact the {$this->reservation->branch} branch before visiting to confirm physical availability, item readiness, and operating hours. Share your reservation reference: {$this->reservation->reference}.")
+            ->line("Selected shop: {$this->reservation->branch}")
+            ->line('This approval confirms the request review only. FurniCraft does not track inventory, and this message does not guarantee that the item is physically in stock or ready.')
+            ->line("Contact Lance Furniture Shop before visiting to confirm physical availability, item readiness, and operating hours. Share your reservation reference: {$this->reservation->reference}.")
             ->line('No purchase or payment has been made through FurniCraft.')
-            ->action('View reservation request', route('reservations.index'))
+            ->action('View reservation request', rtrim((string) config('app.url'), '/').route('reservations.index', [], false))
             ->salutation('Lance Furniture Shop');
     }
 }

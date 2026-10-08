@@ -13,7 +13,7 @@
     <div>
         <p class="section-kicker">Step 3 · Your AI matches</p>
         <h1>{{ ucfirst(strtolower($recommendation->furniture_type ?: 'Furniture')) }} options selected for your room.</h1>
-        <p class="ai-match-summary">We compared your room, style, preferred materials, finish, and budget to rank active catalog choices. Catalog listings do not confirm physical branch stock.</p>
+        <p class="ai-match-summary">We compared your room, style, preferred materials, finish, and budget to rank active catalog choices. Catalog listings do not confirm physical availability at Lance Furniture Shop.</p>
         <span class="small text-muted">{{ $recommendation->furniture_type ? $recommendation->furniture_type.' only' : 'Active catalog furniture' }} · Ranked by room fit and preferences · {{ $recommendation->gemini_used ? 'AI-assisted explanation' : 'Local recommendation fallback' }}</span>
     </div>
     <a class="btn btn-outline-dark" href="{{ route('preferences.edit') }}">Adjust room &amp; preferences</a>
@@ -48,93 +48,8 @@
                     <a href="{{ route('catalog.show',$previewProduct) }}" data-inline-preview-link>View product details</a>
                 </div>
             </article>
-        </aside>
 
-        <div class="inline-preview-visual">
-            <header class="comparison-panel-head">
-                <div>
-                    <span class="room-label">2D placement preview</span>
-                    <h3>Original room / FurniCraft result</h3>
-                </div>
-                <span class="preview-status"><i aria-hidden="true"></i> Planning preview</span>
-            </header>
-
-            <div class="placement-status" aria-live="polite">
-                <div><span class="room-label">Selected furniture · fixed preview</span><strong data-inline-preview-name>{{ $previewProduct->name }}</strong></div>
-                <span><span data-placement-status>{{ data_get($previewPlacement,'renderable',true) ? (data_get($previewPlacement,'validation_status') === 'supported' ? 'AI placement supported' : 'Placement requires verification') : 'No validated placement available' }}</span><br><span data-placement-dimensions></span></span>
-            </div>
-
-            <script type="application/json" data-initial-placement-quad>@json(data_get($previewPlacement, 'quad_percent'))</script>
-
-            <div class="room-comparison" data-room-comparison data-room-width="{{ $room->room_width_m }}" data-room-depth="{{ $room->room_depth_m }}" data-product-width="{{ $previewProduct->width_cm }}" data-product-depth="{{ $previewProduct->depth_cm }}" data-product-height="{{ $previewProduct->height_cm }}" data-product-category="{{ $previewProduct->category }}" data-product-type="{{ $previewProduct->recommendationType() }}" data-placement-ai="{{ in_array(data_get($previewPlacement,'source'), ['candidate-zone','scene-opening'], true) ? 'true' : 'false' }}" data-generated-result="false" data-gemini-unavailable="false" data-placement-type="{{ data_get($room->analysis,'analyzed_furniture_type') }}" data-placement-x="{{ data_get($previewPlacement,'x_percent',50) }}" data-placement-y="{{ data_get($previewPlacement,'y_percent',86) }}" data-placement-width="{{ data_get($previewPlacement,'max_width_percent',72) }}" data-placement-rotation="{{ data_get($previewPlacement,'rotation_deg',0) }}" data-placement-perspective="{{ data_get($previewPlacement,'perspective_deg',0) }}" data-placement-flip="{{ data_get($previewPlacement,'flip',1) }}" data-placement-confidence="{{ data_get($previewPlacement,'confidence','low') }}" data-placement-source="{{ data_get($previewPlacement,'source','type-fallback') }}" data-placement-reason="{{ data_get($previewPlacement,'reason') }}" data-placement-needs-confirmation="{{ data_get($previewPlacement,'needs_confirmation',true) ? 'true' : 'false' }}" data-placement-renderable="{{ data_get($previewPlacement,'renderable',true) ? 'true' : 'false' }}" data-placement-validation="{{ data_get($previewPlacement,'validation_status','advisory') }}" data-placement-measurement="{{ data_get($previewPlacement,'measurement_status','measurements-missing') }}" data-placement-basis="{{ data_get($previewPlacement,'fit_basis','image-estimate') }}" role="slider" tabindex="0" aria-label="Drag left or right to compare the original room and selected furniture planning preview" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" style="--split:50%; --product-width:40%; --product-x:50%; --product-y:84%; --product-rotation:0deg; --product-perspective:0deg; --product-flip:1;">
-                <img class="comparison-room-base" src="{{ route('room-images.original', $room) }}" alt="Original uploaded room">
-                <div class="comparison-result" data-comparison-result aria-hidden="true">
-                    <img class="comparison-room-result" src="{{ route('room-images.original', $room) }}" alt="">
-                    <img class="comparison-product" src="{{ $previewProduct->image_url }}" alt="" draggable="false" data-comparison-product>
-                    <canvas class="comparison-product-warp" data-comparison-product-warp hidden></canvas>
-                    <div class="comparison-result-wash"></div>
-                </div>
-                <span class="comparison-tag comparison-tag-original">Original</span>
-                <span class="comparison-tag comparison-tag-result">Result</span>
-                <span class="comparison-divider" aria-hidden="true"></span>
-            </div>
-
-            <p class="automatic-placement-note"><strong>Placement validation.</strong> <span data-placement-guidance>{{ data_get($previewPlacement,'reason','Choose another recommended product to update this planning preview.') }}</span> <button class="btn btn-sm btn-outline-primary ms-2" type="button" data-placement-confirm hidden>Choose suggested position</button></p>
-        </div>
-    </section>
-@endif
-
-    <section class="ai-matches-results" aria-labelledby="matches-heading">
-        <h2 id="matches-heading" class="h4 mb-3">Ranked matches</h2>
-        <div class="fc-card overflow-hidden">
-            @foreach($recommendation->items as $item)
-                <article class="recommendation-item">
-                    <a href="{{ route('catalog.show',$item->product) }}"><img src="{{ $item->product->image_url }}" alt="{{ $item->product->name }}"></a>
-                    <div>
-                        <p class="product-meta mb-1">#{{ $item->position }} · {{ $item->product->category }}</p>
-                        <h3 class="h4"><a class="text-reset" href="{{ route('catalog.show',$item->product) }}">{{ $item->product->name }}</a></h3>
-                        <p class="recommendation-reason">{{ $item->explanation }}</p>
-                        <p class="product-meta">{{ $item->product->wood_type }} · {{ $item->product->varnish_finish }} · {{ $item->product->width_cm }} × {{ $item->product->depth_cm }} cm</p>
-                        <strong>PHP {{ number_format($item->product->price,2) }}</strong>
-                        <form method="POST" action="{{ route('recommendations.items.feedback', [$recommendation, $item]) }}" class="mt-3 p-2 border rounded">
-                            @csrf
-                            <label class="form-label small mb-1" for="relevance-{{ $item->id }}">Is this recommendation relevant to you?</label>
-                            <select class="form-select form-select-sm mb-2" id="relevance-{{ $item->id }}" name="rejection_reason" aria-label="Reason this recommendation is not relevant">
-                                <option value="">If not relevant, choose a reason</option>
-                                @foreach(['style' => 'Style', 'price' => 'Price', 'material' => 'Material or finish', 'dimensions' => 'Dimensions', 'room_fit' => 'Room fit', 'other' => 'Other'] as $reason => $label)
-                                    <option value="{{ $reason }}" @selected($item->rejection_reason === $reason)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            <div class="d-flex gap-2 align-items-center">
-                                <button class="btn btn-sm {{ $item->relevance === true ? 'btn-success' : 'btn-outline-success' }}" name="relevance" value="1">Relevant</button>
-                                <button class="btn btn-sm {{ $item->relevance === false ? 'btn-danger' : 'btn-outline-secondary' }}" name="relevance" value="0">Not relevant</button>
-                                @if($item->evaluated_at)<span class="small text-muted">Recorded {{ $item->evaluated_at->diffForHumans() }}</span>@endif
-                            </div>
-                        </form>
-                        @if($room)
-                            <div class="mt-2">
-                                @php($itemPlacement = $placements->get($item->product->id) ?? [])
-                                <script type="application/json" data-recommendation-placement-quad>@json(data_get($itemPlacement, 'quad_percent'))</script>
-                                <button class="btn btn-sm {{ $loop->first ? 'btn-primary is-active' : 'btn-outline-primary' }}" type="button" data-recommendation-preview data-name="{{ $item->product->name }}" data-image="{{ $item->product->image_url }}" data-width="{{ $item->product->width_cm }}" data-depth="{{ $item->product->depth_cm }}" data-height="{{ $item->product->height_cm }}" data-category="{{ $item->product->category }}" data-type="{{ $item->product->recommendationType() }}" data-price="{{ number_format($item->product->price,2) }}" data-score="{{ number_format($item->total_score,0) }}% match" data-url="{{ route('catalog.show',$item->product) }}" data-placement-x="{{ data_get($itemPlacement,'x_percent',50) }}" data-placement-y="{{ data_get($itemPlacement,'y_percent',86) }}" data-placement-width="{{ data_get($itemPlacement,'max_width_percent',72) }}" data-placement-rotation="{{ data_get($itemPlacement,'rotation_deg',0) }}" data-placement-perspective="{{ data_get($itemPlacement,'perspective_deg',0) }}" data-placement-flip="{{ data_get($itemPlacement,'flip',1) }}" data-placement-confidence="{{ data_get($itemPlacement,'confidence','low') }}" data-placement-source="{{ data_get($itemPlacement,'source','type-fallback') }}" data-placement-reason="{{ data_get($itemPlacement,'reason') }}" data-placement-needs-confirmation="{{ data_get($itemPlacement,'needs_confirmation',true) ? 'true' : 'false' }}" data-placement-renderable="{{ data_get($itemPlacement,'renderable',true) ? 'true' : 'false' }}" data-placement-validation="{{ data_get($itemPlacement,'validation_status','advisory') }}" data-placement-measurement="{{ data_get($itemPlacement,'measurement_status','measurements-missing') }}" data-placement-basis="{{ data_get($itemPlacement,'fit_basis','image-estimate') }}" aria-pressed="{{ $loop->first ? 'true' : 'false' }}">{{ $loop->first ? 'Showing in room' : 'Preview here' }}</button>
-                            </div>
-                        @endif
-                    </div>
-                    <div>
-                        <div class="score">{{ number_format($item->total_score,0) }}%</div>
-                        <form method="POST" action="{{ route('reservations.store') }}" class="mt-3 vstack gap-2">
-                            @csrf
-                            <input type="hidden" name="furniture_product_id" value="{{ $item->product->id }}">
-                            <input type="hidden" name="recommendation_id" value="{{ $recommendation->id }}">
-                            <select class="form-select form-select-sm" name="branch" required><option value="">Branch</option>@foreach(['Lingayen','Calasiao','San Jacinto','Sta. Barbara','Pozorrubio','Tarlac'] as $branch)<option>{{ $branch }}</option>@endforeach</select>
-                            <button class="btn btn-sm btn-primary">Reserve</button>
-                        </form>
-                    </div>
-                </article>
-            @endforeach
-        </div>
-    </section>
-
-    <aside class="ai-matches-chat">
+            <aside class="ai-matches-chat">
         <div class="chat-panel">
             <div class="chat-head"><h2 class="h4 mb-1">Ask about these matches</h2><p class="small mb-0">Answers stay within this recommendation and Lance catalog data.</p></div>
             <div class="chat-log">
@@ -151,6 +66,101 @@
                 <button class="btn btn-light w-100 mt-2">Ask FurniCraft</button>
             </form>
         </div>
-    </aside>
+            </aside>
+        </aside>
+
+        <div class="inline-preview-visual">
+            <header class="comparison-panel-head">
+                <div>
+                    <span class="room-label">2D placement preview</span>
+                    <h3>Automatic 2D room preview</h3>
+                </div>
+                <span class="preview-status"><i aria-hidden="true"></i> Planning preview</span>
+            </header>
+
+            <div class="placement-status" aria-live="polite">
+                <div><span class="room-label">Furniture selected for this preview</span><strong data-inline-preview-name>{{ $previewProduct->name }}</strong></div>
+                <span><span data-placement-status>{{ data_get($previewPlacement,'renderable',true) ? 'Automatic image fit' : 'No validated placement available' }}</span><br><span data-placement-dimensions></span></span>
+                <p data-placement-guidance class="small mb-0"></p>
+            </div>
+
+
+
+            <script type="application/json" data-preview-analysis>@json($room->analysis ?? [])</script>
+            <div class="room-preview-frame room-comparison" data-room-preview role="slider" tabindex="0" aria-label="Before and after preview. Use the arrow keys to move the divider." aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" data-split="50"
+                data-room-width="{{ $room->room_width_m }}" data-room-depth="{{ $room->room_depth_m }}"
+                data-product-id="{{ $previewProduct->id }}" data-product-name="{{ $previewProduct->name }}"
+                data-product-width="{{ $previewProduct->width_cm }}" data-product-depth="{{ $previewProduct->depth_cm }}" data-product-height="{{ $previewProduct->height_cm }}" data-product-dimensions-estimated="{{ $previewProduct->dimensions_estimated ? 'true' : 'false' }}"
+                data-product-type="{{ $previewProduct->recommendationType() }}" data-product-category="{{ $previewProduct->category }}"
+                data-initial-x="{{ data_get($previewPlacement,'x_percent',50) }}" data-initial-y="{{ data_get($previewPlacement,'y_percent',86) }}"
+                data-initial-width="{{ data_get($previewPlacement,'max_width_percent',65) }}" data-initial-quad='@json(data_get($previewPlacement,"quad_percent"))'
+                data-confidence="{{ data_get($previewPlacement,'confidence','low') }}" data-placement-source="{{ data_get($previewPlacement,'source','safe-fallback') }}"
+                data-placement-status="{{ $room->analysis_status }}" data-consented="{{ $room->gemini_consent_at ? 'true' : 'false' }}"
+                data-preview-v2-url="{{ route('room.preview-v2.store', $room) }}"
+                data-verify-url="{{ route('room.preview-verify', [$room,$previewProduct]) }}" data-csrf="{{ csrf_token() }}">
+                <img class="comparison-room-base" src="{{ route('room-images.original', $room) }}" alt="Before: original room">
+                <img class="room-preview-source" src="{{ route('room-images.original', $room) }}" alt="" data-preview-room>
+                <img class="room-preview-source" src="{{ $previewProduct->image_url }}" alt="" data-preview-product>
+                <div class="comparison-result" data-comparison-result>
+                    <canvas class="room-preview-canvas" data-room-preview-canvas role="img" aria-label="After: room with automatically fitted furniture"></canvas>
+                </div>
+                <div class="comparison-divider" data-comparison-divider aria-hidden="true"></div>
+                <span class="comparison-tag comparison-tag-original" aria-hidden="true">Before</span>
+                <span class="comparison-tag comparison-tag-result" aria-hidden="true">After</span>
+                <div class="room-preview-loading" data-preview-loading role="status" aria-live="polite">Uploading · Analyzing room · Fitting furniture · Checking the result</div>
+            </div>
+            <div class="preview-detection-row" data-preview-detections aria-live="polite"></div>
+            <div class="room-preview-actions">
+                <button type="button" class="btn btn-primary" data-preview-download>Download preview (PNG)</button>
+                <form method="POST" action="{{ route('room.reanalyze',$room) }}">@csrf<button class="btn btn-outline-secondary" type="submit">Try again</button></form>
+                <a class="btn btn-outline-secondary" href="{{ route('preferences.edit',['room'=>$room->id]) }}#room-preview">Upload another photo</a>
+            </div>
+            <p class="automatic-placement-note">Preview is an estimate, not a measurement. Verify actual dimensions with Lance Furniture Shop before reserving.</p>
+        </div>
+    </section>
+@endif
+
+    <section class="ai-matches-results" aria-labelledby="matches-heading">
+        <h2 id="matches-heading" class="h4 mb-3">Ranked matches</h2>
+        <div class="fc-card overflow-hidden">
+            @foreach($recommendation->items as $item)
+                <article class="recommendation-item">
+                    <a href="{{ route('catalog.show',$item->product) }}"><img src="{{ $item->product->image_url }}" alt="{{ $item->product->name }}"></a>
+                    <div>
+                        <p class="product-meta mb-1">#{{ $item->position }} · {{ $item->product->category }}</p>
+                        <h3 class="h4"><a class="text-reset" href="{{ route('catalog.show',$item->product) }}">{{ $item->product->name }}</a></h3>
+                        <p class="recommendation-reason">{{ $item->explanation }}</p>
+                        <p class="product-meta">{{ $item->product->wood_type }} · {{ $item->product->varnish_finish }} · {{ number_format((float) $item->product->width_cm, 0) }} × {{ number_format((float) $item->product->depth_cm, 0) }} cm @if($item->product->dimensions_estimated)· standard estimate @endif</p>
+                        <strong>PHP {{ number_format($item->product->price,2) }}</strong>
+                        @if($room)
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-recommendation-preview
+                                data-product-id="{{ $item->product->id }}" data-product-name="{{ $item->product->name }}"
+                                data-product-image="{{ $item->product->image_url }}" data-product-width="{{ $item->product->width_cm }}"
+                                data-product-depth="{{ $item->product->depth_cm }}" data-product-height="{{ $item->product->height_cm }}" data-product-dimensions-estimated="{{ $item->product->dimensions_estimated ? 'true' : 'false' }}"
+                                data-product-type="{{ $item->product->recommendationType() }}" data-product-category="{{ $item->product->category }}"
+                                data-product-score="{{ number_format($item->total_score,0) }}" data-product-price="{{ number_format($item->product->price,2) }}"
+                                data-product-url="{{ route('catalog.show',$item->product) }}"
+                                data-verify-url="{{ route('room.preview-verify', [$room,$item->product]) }}"
+                                aria-pressed="{{ $previewProduct->id === $item->product->id ? 'true' : 'false' }}">
+                                {{ $previewProduct->id === $item->product->id ? 'Selected' : 'Preview in room' }}
+                            </button>
+                        @endif
+                    </div>
+                    <div>
+                        <div class="score">{{ number_format($item->total_score,0) }}%</div>
+                        <form method="POST" action="{{ route('reservations.store') }}" class="mt-3 vstack gap-2">
+                            @csrf
+                            <input type="hidden" name="furniture_product_id" value="{{ $item->product->id }}">
+                            <input type="hidden" name="recommendation_id" value="{{ $recommendation->id }}">
+                            <input class="form-control form-control-sm" type="datetime-local" name="preferred_visit_at" min="{{ now()->format('Y-m-d\\TH:i') }}" aria-label="Preferred visit date and time"><select class="form-select form-select-sm" name="branch" required>@foreach(config('furnicraft.branches') as $branch)<option value="{{ $branch }}" @selected($branch === config('furnicraft.branch'))>{{ $branch }}</option>@endforeach</select>
+                            @include('reservations._customization-fields', ['formSuffix' => 'recommendation-'.$item->product->id])<button class="btn btn-sm btn-primary">Reserve</button>
+                        </form>
+                    </div>
+                </article>
+            @endforeach
+        </div>
+    </section>
+
+
 </div>
 @endsection

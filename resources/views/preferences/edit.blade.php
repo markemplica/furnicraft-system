@@ -34,8 +34,8 @@
             <div class="col-md-4"><label class="form-label" for="budget_min">Minimum budget PHP</label><input class="form-control" id="budget_min" type="number" min="0" step="100" name="budget_min" value="{{ old('budget_min',$preference?->budget_min ?? 5000) }}" required></div>
             <div class="col-md-4"><label class="form-label" for="budget_max">Maximum budget PHP</label><input class="form-control" id="budget_max" type="number" min="1" step="100" name="budget_max" value="{{ old('budget_max',$preference?->budget_max ?? 50000) }}" required></div>
             <div class="col-md-4"><label class="form-label" for="style">Furniture style</label><select class="form-select" id="style" name="style"><option value="">Open to any style</option>@foreach($styles as $style)<option @selected(old('style',$preference?->style)===$style)>{{ $style }}</option>@endforeach</select></div>
-            <div class="col-md-4"><label class="form-label" for="wood_type">Wood type</label><select class="form-select" id="wood_type" name="wood_type"><option value="">Either wood</option>@foreach(['Gmelina','Mahogany'] as $value)<option @selected(old('wood_type',$preference?->wood_type)===$value)>{{ $value }}</option>@endforeach</select></div>
-            <div class="col-md-4"><label class="form-label" for="varnish_finish">Varnish finish</label><select class="form-select" id="varnish_finish" name="varnish_finish"><option value="">Any finish</option>@foreach(['Natural','Narra Look','Mahogany','Chocolate Brown'] as $value)<option @selected(old('varnish_finish',$preference?->varnish_finish)===$value)>{{ $value }}</option>@endforeach</select></div>
+            <div class="col-md-4"><label class="form-label" for="wood_type">Wood type</label><select class="form-select" id="wood_type" name="wood_type"><option value="">Either wood</option>@foreach($woodTypes as $value)<option @selected(old('wood_type',$preference?->wood_type)===$value)>{{ $value }}</option>@endforeach</select></div>
+            <div class="col-md-4"><label class="form-label" for="varnish_finish">Varnish finish</label><select class="form-select" id="varnish_finish" name="varnish_finish"><option value="">Any finish</option>@foreach($varnishFinishes as $value)<option @selected(old('varnish_finish',$preference?->varnish_finish)===$value)>{{ $value }}</option>@endforeach</select></div>
             <div class="col-12"><label class="form-label" for="notes">What else matters?</label><textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Example: Easy-clean dining furniture for a family of six.">{{ old('notes',$preference?->notes) }}</textarea></div>
             <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary btn-lg" type="submit" data-preferences-submit>{{ $preference ? 'Update preferences' : 'Save preferences and continue' }}</button></div>
         </div>
@@ -64,17 +64,25 @@
                 <fieldset class="vstack gap-3" data-room-upload-fieldset @disabled(!$preferenceComplete)>
                     <div>
                         <label class="form-label" for="room_image">Room photo</label>
-                        <input class="form-control" id="room_image" type="file" name="room_image" accept="image/jpeg,image/png,image/webp" required>
-                        <div class="form-text">JPG, PNG, or WebP up to 5 MB. Avoid people and personal documents.</div>
-                    </div>
+                        <input class="form-control" id="room_image" type="file" name="room_image" data-room-photo-input accept="image/jpeg,image/png,image/webp" required>
+                        <div class="form-text">JPG, PNG, or WebP up to 8 MB. Photos must be at least 600 px on the longest side.</div>
+                        <div class="small mt-2" data-room-photo-quality role="status" aria-live="polite"></div>
                     <div class="row g-3">
-                        <div class="col-6"><label class="form-label" for="upload_room_width_m">Known width m <span class="text-muted">(optional)</span></label><input class="form-control" id="upload_room_width_m" type="number" name="room_width_m" min="1" max="50" step=".1"></div>
-                        <div class="col-6"><label class="form-label" for="upload_room_depth_m">Known depth m <span class="text-muted">(optional)</span></label><input class="form-control" id="upload_room_depth_m" type="number" name="room_depth_m" min="1" max="50" step=".1"></div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="room_width_m">Known room width (m) <span class="text-muted">optional</span></label>
+                            <input class="form-control" id="room_width_m" type="number" name="room_width_m" min="1" max="50" step="0.1" value="{{ old('room_width_m') }}" inputmode="decimal" aria-describedby="room-dimensions-help">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="room_depth_m">Known room depth (m) <span class="text-muted">optional</span></label>
+                            <input class="form-control" id="room_depth_m" type="number" name="room_depth_m" min="1" max="50" step="0.1" value="{{ old('room_depth_m') }}" inputmode="decimal" aria-describedby="room-dimensions-help">
+                        </div>
+                        <div class="col-12 form-text" id="room-dimensions-help">Enter measurements in meters (for example, 3 m = 300 cm). They take priority over estimates from the photo; leave both blank to use visual estimates when available.</div>
                     </div>
-                    <button class="btn btn-primary btn-lg" type="submit">Analyze and select this room</button>
+                    </div>
+                    <button class="btn btn-primary btn-lg" type="submit">Upload room photo</button>
                 </fieldset>
-                <label class="form-check panel mb-0"><input class="form-check-input" type="checkbox" name="gemini_consent" value="1"><span class="form-check-label">I consent to sending this room photo to Google Gemini for AI room analysis and generated previews. <a href="{{ route('privacy-policy') }}" target="_blank" rel="noopener">Read how images are handled</a>. Leave unchecked for local guidance only.</span></label>
-                <p class="small text-muted mb-0">Known measurements override visual estimates. Room photos are stored privately, stripped of EXIF metadata, and retained for {{ (int) config('privacy.room_image_retention_days', 90) }} days unless deleted sooner.</p>
+                <label class="form-check panel room-photo-consent mb-0"><input class="form-check-input" type="checkbox" name="gemini_consent" value="1"><span class="form-check-label">Allow Google Gemini to analyze this photo and create previews. Without consent, local estimates are used. <a href="{{ route('privacy-policy') }}" target="_blank" rel="noopener">Privacy details</a></span></label>
+                <p class="small text-muted mb-0">Known measurements override visual estimates. Image-based measurements are approximate and may be unavailable for unclear photos or when AI analysis is not enabled. Room photos are stored privately, stripped of EXIF metadata, and retained for {{ (int) config('privacy.room_image_retention_days', 90) }} days unless deleted sooner.</p>
             </form>
         </div>
 
@@ -85,13 +93,13 @@
                 @php($isSelectedRoom = $activeRoomId === $room->id)
                 @php($roomReady = in_array($room->analysis_status, ['completed', 'fallback'], true))
                 @php($statusLabel = ['completed' => 'AI analyzed', 'queued' => 'Queued', 'processing' => 'Analyzing', 'retrying' => 'Retrying', 'failed' => 'Needs retry'][$room->analysis_status] ?? 'Local guidance')
-                <article class="panel room-option mb-3 d-flex flex-column flex-sm-row gap-3 align-items-sm-center {{ $isSelectedRoom ? 'is-selected' : '' }}" data-room-option data-room-id="{{ $room->id }}" data-room-ready="{{ $roomReady ? 'true' : 'false' }}" data-room-analysis-watch="{{ route('room.analysis-status', $room) }}" role="button" tabindex="0" aria-pressed="{{ $isSelectedRoom ? 'true' : 'false' }}" aria-label="Use Room {{ $room->id }} for recommendations">
+                <article class="panel room-option mb-3 d-flex flex-column flex-sm-row gap-3 align-items-sm-center {{ $isSelectedRoom ? 'is-selected' : '' }}" data-room-option data-room-id="{{ $room->id }}" data-room-ready="{{ $roomReady ? 'true' : 'false' }}" data-room-analysis-current="{{ $room->analysis_status }}" data-room-analysis-watch="{{ route('room.analysis-status', $room) }}" role="button" tabindex="0" aria-pressed="{{ $isSelectedRoom ? 'true' : 'false' }}" aria-label="Use Room {{ $room->id }} for recommendations">
                     <img src="{{ route('room-images.original', $room) }}" alt="Uploaded room from {{ $room->created_at->format('M j, Y') }}" width="140" height="100" style="object-fit:cover">
                     <div class="flex-grow-1">
                         <div><strong>Room {{ $room->id }} · {{ $room->created_at->format('F j, Y · g:i A') }}</strong><span class="badge text-bg-primary ms-1" data-room-selected-badge @if(!$isSelectedRoom) hidden @endif>Selected</span><span class="badge text-bg-light ms-1" data-room-analysis-label>{{ $statusLabel }}</span></div>
-                        <p class="small text-muted mb-2">{{ $room->room_width_m ?: '?' }} × {{ $room->room_depth_m ?: '?' }} m · {{ data_get($room->analysis,'dimension_confidence','unavailable') }} dimensions<span data-room-analysis-message>@if($room->analysis_error) · {{ $room->analysis_error }}@endif</span></p>
+                        <p class="small text-muted mb-2">{{ $room->room_width_m ?: data_get($room->analysis,'estimated_width_m') ?: '?' }} × {{ $room->room_depth_m ?: data_get($room->analysis,'estimated_depth_m') ?: '?' }} m · {{ data_get($room->analysis,'dimension_confidence','unavailable') }} dimensions<span data-room-analysis-message>@if($room->analysis_error) · {{ $room->analysis_error }}@endif</span></p>
                         <div class="d-flex flex-wrap gap-2">
-                            <a class="btn btn-sm btn-outline-primary" href="{{ route('room.visualize',$room) }}">Open 2D preview</a>
+                            
                             <form method="POST" action="{{ route('room.destroy', $room) }}" onsubmit="return confirm('Delete this room photo and its generated previews?')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" type="submit">Delete photo</button></form>
                             @unless(in_array($room->analysis_status, ['queued', 'processing', 'retrying'], true))
                                 <form method="POST" action="{{ route('room.reanalyze', $room) }}">@csrf<button class="btn btn-sm btn-outline-dark" type="submit">Re-analyze room</button></form>

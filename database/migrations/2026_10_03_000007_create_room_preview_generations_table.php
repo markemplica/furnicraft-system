@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('attempts')->default(0);
             $table->text('message')->nullable();
             $table->timestamps();
-            $table->unique(['room_image_id', 'furniture_product_id']);
+            $table->unique(['room_image_id', 'furniture_product_id'], 'room_preview_image_product_uq');
         });
     }
 
@@ -25,3 +25,4 @@ return new class extends Migration
         Schema::dropIfExists('room_preview_generations');
     }
 };
+

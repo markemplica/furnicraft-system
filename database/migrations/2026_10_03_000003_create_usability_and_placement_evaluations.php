@@ -27,7 +27,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->unique(['room_image_id', 'evaluator_id']);
-            $table->index(['floor_detection_correct', 'zone_appropriate']);
+            $table->index(['floor_detection_correct', 'zone_appropriate'], 'placement_eval_flags_idx');
         });
     }
 
@@ -37,3 +37,4 @@ return new class extends Migration
         Schema::dropIfExists('system_usability_responses');
     }
 };
+

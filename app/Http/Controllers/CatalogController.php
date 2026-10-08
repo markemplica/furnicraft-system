@@ -35,7 +35,7 @@ class CatalogController extends Controller
             });
         }
         $products = $query->orderBy('name')->paginate(12)->withQueryString();
-        $options = ['categories' => FurnitureProduct::where('status', 'active')->distinct()->orderBy('category')->pluck('category'), 'styles' => FurnitureProduct::where('status', 'active')->distinct()->orderBy('style')->pluck('style')];
+        $options = ['categories' => FurnitureProduct::where('status', 'active')->distinct()->orderBy('category')->pluck('category'), 'styles' => FurnitureProduct::where('status', 'active')->distinct()->orderBy('style')->pluck('style'), 'woods' => FurnitureProduct::where('status', 'active')->distinct()->orderBy('wood_type')->pluck('wood_type'), 'finishes' => FurnitureProduct::where('status', 'active')->distinct()->orderBy('varnish_finish')->pluck('varnish_finish')];
         $favoriteIds = $request->user()->favorites()->pluck('furniture_products.id');
 
         return view('catalog.index', compact('products', 'options', 'favoriteIds'));

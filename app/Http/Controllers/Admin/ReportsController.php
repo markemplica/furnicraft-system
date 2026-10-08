@@ -13,7 +13,7 @@ use Illuminate\Validation\Rule;
 
 class ReportsController extends Controller
 {
-    private const BRANCHES = ['Lingayen', 'Calasiao', 'San Jacinto', 'Sta. Barbara', 'Pozorrubio', 'Tarlac'];
+
 
     public function index(Request $request)
     {
@@ -54,7 +54,7 @@ class ReportsController extends Controller
             'report' => ['nullable', Rule::in(['reservations', 'recommendations', 'customers', 'furniture'])],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'branch' => ['nullable', Rule::in(self::BRANCHES)],
+            'branch' => ['nullable', Rule::in(config('furnicraft.branches'))],
         ]);
     }
 
@@ -105,9 +105,9 @@ class ReportsController extends Controller
     {
         return match ($report) {
             'recommendations' => [['Recommendation ID', 'Created At', 'Customer', 'Email', 'Furniture Type', 'Algorithm', 'Content Weight', 'Collaborative Weight', 'Items', 'Linked Reservations'], ['id', 'created_at', 'user_name', 'user_email', 'furniture_type', 'algorithm_version', 'content_weight', 'collaborative_weight', 'items_count', 'reservation_count']],
-            'customers' => [['Customer ID', 'Name', 'Email', 'Phone', 'Branch', 'Active', 'Joined At', 'Recommendations', 'Reservations'], ['id', 'name', 'email', 'phone', 'branch', 'is_active', 'created_at', 'recommendations_count', 'reservations_count']],
+            'customers' => [['Customer ID', 'Name', 'Email', 'Phone', 'Shop location', 'Active', 'Joined At', 'Recommendations', 'Reservations'], ['id', 'name', 'email', 'phone', 'branch', 'is_active', 'created_at', 'recommendations_count', 'reservations_count']],
             'furniture' => [['Product ID', 'Name', 'Category', 'Style', 'Wood', 'Finish', 'Price PHP', 'Width cm', 'Depth cm', 'Height cm', 'Status', 'Views', 'Favorites', 'Reservations'], ['id', 'name', 'category', 'style', 'wood_type', 'varnish_finish', 'price', 'width_cm', 'depth_cm', 'height_cm', 'status', 'views_count', 'favorites_count', 'reservations_count']],
-            default => [['Reference', 'Created At', 'Customer', 'Email', 'Furniture', 'Category', 'Branch', 'Status', 'Recommendation ID', 'Notes'], ['reference', 'created_at', 'user_name', 'user_email', 'product_name', 'product_category', 'branch', 'status', 'recommendation_id', 'notes']],
+            default => [['Reference', 'Created At', 'Customer', 'Email', 'Furniture', 'Category', 'Shop location', 'Status', 'Recommendation ID', 'Notes'], ['reference', 'created_at', 'user_name', 'user_email', 'product_name', 'product_category', 'branch', 'status', 'recommendation_id', 'notes']],
         };
     }
 

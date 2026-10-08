@@ -33,14 +33,7 @@ class RecommendationService
             return ['product' => $product, 'content' => $content, 'collaborative' => $collab, 'total' => $total];
         })->sortByDesc('total')->take(8)->values();
 
-        $ai = $this->gemini->recommendationSummary(array_merge($preference->toArray(), ['furniture_type' => $furnitureType]), $ranked->map(fn ($row) => [
-            'name' => $row['product']->name,
-            'score' => $row['total'],
-            'price' => $row['product']->price,
-            'wood' => $row['product']->wood_type,
-            'finish' => $row['product']->varnish_finish,
-            'style' => $row['product']->style,
-        ])->all());
+        $ai = $this->gemini->localRecommendationSummary(array_merge($preference->toArray(), ['furniture_type' => $furnitureType]));
 
         return DB::transaction(function () use ($user, $preference, $roomImage, $furnitureType, $ranked, $ai, $hasPriorSignals) {
             $recommendation = Recommendation::create([
@@ -72,7 +65,7 @@ class RecommendationService
                     'collaborative_score' => $row['collaborative'],
                     'total_score' => $row['total'],
                     'position' => $index + 1,
-                    'explanation' => $reasons->isEmpty() ? 'This is the closest active catalog match based on your combined preferences; branch stock must be confirmed.' : ucfirst($reasons->implode(', ')).'.',
+                    'explanation' => $reasons->isEmpty() ? 'This is the closest active catalog match based on your combined preferences; physical availability must be confirmed with Lance Furniture Shop.' : ucfirst($reasons->implode(', ')).'.',
                 ]);
             }
 
@@ -112,12 +105,12 @@ class RecommendationService
 
         $signals = collect();
         if ($similarUserIds->isNotEmpty()) {
-            $signals = Favorite::whereIn('user_id', $similarUserIds)->select('furniture_product_id', DB::raw('count(*) as signal'))
-                ->groupBy('furniture_product_id')->pluck('signal', 'furniture_product_id');
+            $signals = Favorite::whereIn('user_id', $similarUserIds)->select('furniture_product_id', DB::raw('count(*) as favorite_count'))
+                ->groupBy('furniture_product_id')->pluck('favorite_count', 'furniture_product_id');
         }
 
         if ($signals->isEmpty()) {
-            $signals = Favorite::select('furniture_product_id', DB::raw('count(*) as signal'))->groupBy('furniture_product_id')->pluck('signal', 'furniture_product_id');
+            $signals = Favorite::select('furniture_product_id', DB::raw('count(*) as favorite_count'))->groupBy('furniture_product_id')->pluck('favorite_count', 'furniture_product_id');
         }
 
         $max = max(1, (int) $signals->max());
@@ -130,3 +123,4 @@ class RecommendationService
         return blank($expected) || strcasecmp(trim($expected), trim((string) $actual)) === 0;
     }
 }
+

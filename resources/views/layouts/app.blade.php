@@ -25,18 +25,13 @@
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}" href="{{ route('admin.reports.index') }}">Reports</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.customers.*') ? 'active' : '' }}" href="{{ route('admin.customers.index') }}">Customers</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.recommendation-evaluation') ? 'active' : '' }}" href="{{ route('admin.recommendation-evaluation') }}">Recommendation evaluation</a></li>
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.room-placement-evaluation*') ? 'active' : '' }}" href="{{ route('admin.room-placement-evaluation') }}">Room accuracy review</a></li>
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.system-usability-results') ? 'active' : '' }}" href="{{ route('admin.system-usability-results') }}">SUS results</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.privacy-audit') ? 'active' : '' }}" href="{{ route('admin.privacy-audit') }}">Privacy audit</a></li>
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.ai-service-health') ? 'active' : '' }}" href="{{ route('admin.ai-service-health') }}">AI service health</a></li>
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.deployment-readiness') ? 'active' : '' }}" href="{{ route('admin.deployment-readiness') }}">Deployment readiness</a></li>
                 @else
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}" href="{{ route('home') }}">Home</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('how-it-works') ? 'active' : '' }}" href="{{ route('how-it-works') }}">How it works</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('catalog.*') ? 'active' : '' }}" href="{{ route('catalog.index') }}">Catalog</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('preferences.*','recommendations.*','room.*') ? 'active' : '' }}" href="{{ route('preferences.edit') }}">Plan your room</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('reservations.*') ? 'active' : '' }}" href="{{ route('reservations.index') }}">Reservations</a></li>
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('usability.*') ? 'active' : '' }}" href="{{ route('usability.edit') }}">Usability survey</a></li>
                 @endif
                 <li class="nav-item dropdown ms-lg-2">
                     <button class="btn account-button dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">{{ auth()->user()->name }}</button>
@@ -80,11 +75,13 @@
 
 <main id="main-content" class="{{ auth()->check() || request()->routeIs('home', 'how-it-works') ? 'page-shell' : 'guest-shell' }}">
     <div class="container-xl">
-        @if(session('success')) <div class="alert alert-success fc-alert" role="status">{{ session('success') }}</div> @endif
-        @if(session('warning')) <div class="alert alert-warning fc-alert" role="status">{{ session('warning') }}</div> @endif
-        @if($errors->any())
+        @unless(request()->routeIs('password.reset'))
+            @if(session('success')) <div class="alert alert-success fc-alert" role="status">{{ session('success') }}</div> @endif
+            @if(session('warning')) <div class="alert alert-warning fc-alert" role="status">{{ session('warning') }}</div> @endif
+            @if($errors->any() && !request()->routeIs('login'))
             <div class="alert alert-danger fc-alert" role="alert"><strong>Please check the form.</strong><ul class="mb-0 mt-1">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
-        @endif
+            @endif
+        @endunless
         @yield('content')
     </div>
 </main>
@@ -100,6 +97,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ asset('js/furnicraft.js') }}?v={{ filemtime(public_path('js/furnicraft.js')) }}"></script>
+<script src="{{ asset('js/room-preview-engine.js') }}?v={{ filemtime(public_path('js/room-preview-engine.js')) }}"></script>
 @stack('scripts')
 </body>
 </html>

@@ -14,8 +14,8 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('category')->index();
             $table->text('description');
-            $table->enum('wood_type', ['Gmelina', 'Mahogany'])->index();
-            $table->enum('varnish_finish', ['Natural', 'Narra Look', 'Mahogany', 'Chocolate Brown'])->index();
+            $table->string('wood_type')->index();
+            $table->string('varnish_finish')->index();
             $table->string('style')->index();
             $table->decimal('price', 12, 2)->index();
             $table->decimal('width_cm', 8, 2)->nullable();
@@ -74,7 +74,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('position');
             $table->text('explanation');
             $table->timestamps();
-            $table->unique(['recommendation_id', 'furniture_product_id']);
+            $table->unique(['recommendation_id', 'furniture_product_id'], 'rec_items_rec_product_uq');
         });
 
         Schema::create('favorites', function (Blueprint $table) {

@@ -10,6 +10,8 @@
         <h1>See <span data-preview-name>{{ $selectedProduct?->name ?? 'furniture' }}</span> in your space.</h1>
         <p class="room-compare-intro">FurniCraft automatically positions and scales the selected furniture using the clear area detected in the room photo and its catalog dimensions.</p>
 
+
+
         <section class="room-source" aria-labelledby="image-used-heading">
             <h2 id="image-used-heading" class="room-label">Image used</h2>
             <div class="room-source-card">
@@ -38,7 +40,7 @@
 
     <section class="comparison-panel" aria-labelledby="comparison-heading">
         <header class="comparison-panel-head">
-            <div><span class="room-label">2D placement preview</span><h2 id="comparison-heading">Original room / FurniCraft result</h2></div>
+            <div><span class="room-label">2D placement preview</span><h2 id="comparison-heading">Automatic 2D room preview</h2></div>
             <span class="preview-status"><i aria-hidden="true"></i> Planning preview</span>
         </header>
 
@@ -52,53 +54,47 @@
                 @endunless
             </div>
         </div>
-
-        @if($recommendation && $selectedProduct && $roomImage->gemini_consent_at && $geminiPreviewUnavailable)
-            @php($previewRunning = $previewGeneration && in_array($previewGeneration->status, ['queued', 'processing', 'retrying'], true))
-            <div class="alert {{ $previewGeneration && in_array($previewGeneration->status, ['failed', 'fallback'], true) ? 'alert-warning' : 'alert-info' }} fc-alert" role="status" aria-live="polite" data-preview-watch="{{ route('room.preview-status', [$roomImage, $selectedProduct->id]) }}" data-preview-status="{{ $previewGeneration?->status ?? 'queued' }}">
-                <strong data-preview-label>{{ $previewRunning ? 'Preparing your furnished-room image in the background' : (($previewGeneration?->status === 'failed' || $previewGeneration?->status === 'fallback') ? 'Showing local 2D placement preview' : 'Preparing your furnished-room image in the background') }}</strong>
-                <span data-preview-message>{{ $previewGeneration?->message ?: 'You can keep using this page. The image will appear automatically when ready.' }}</span>
-            </div>
-        @endif
-
-        <div class="placement-status" aria-live="polite">
-            <div><span class="room-label">Selected furniture · planning preview</span><strong data-placement-status>{{ data_get($selectedPlacement, 'renderable', true) ? (data_get($selectedPlacement, 'validation_status') === 'supported' ? 'AI placement supported' : 'Placement requires verification') : 'No validated placement available' }}</strong></div>
+<div class="placement-status" aria-live="polite">
+            <div><span class="room-label">Selected furniture · planning preview</span><strong data-placement-status>{{ data_get($selectedPlacement, 'renderable', true) ? 'Automatic image fit' : 'No validated placement available' }}</strong></div>
             <span data-placement-dimensions></span>
+            <p data-placement-guidance class="small mb-0"></p>
         </div>
 
         <script type="application/json" data-initial-placement-quad>@json(data_get($selectedPlacement, 'quad_percent'))</script>
 
-        <div class="room-comparison" data-room-comparison data-room-width="{{ $roomImage->room_width_m }}" data-room-depth="{{ $roomImage->room_depth_m }}" data-product-width="{{ $selectedProduct?->width_cm }}" data-product-depth="{{ $selectedProduct?->depth_cm }}" data-product-height="{{ $selectedProduct?->height_cm }}" data-product-category="{{ $selectedProduct?->category }}" data-product-type="{{ $selectedProduct?->recommendationType() }}" data-placement-ai="{{ in_array(data_get($selectedPlacement,'source'), ['candidate-zone','scene-opening'], true) ? 'true' : 'false' }}" data-generated-result="{{ $generatedWithGemini ? 'true' : 'false' }}" data-gemini-unavailable="{{ $geminiPreviewUnavailable ? 'true' : 'false' }}" data-placement-type="{{ data_get($roomImage->analysis,'analyzed_furniture_type') }}" data-placement-x="{{ data_get($selectedPlacement,'x_percent',50) }}" data-placement-y="{{ data_get($selectedPlacement,'y_percent',86) }}" data-placement-width="{{ data_get($selectedPlacement,'max_width_percent',72) }}" data-placement-rotation="{{ data_get($selectedPlacement,'rotation_deg',0) }}" data-placement-perspective="{{ data_get($selectedPlacement,'perspective_deg',0) }}" data-placement-flip="{{ data_get($selectedPlacement,'flip',1) }}" data-placement-confidence="{{ data_get($selectedPlacement,'confidence','low') }}" data-placement-source="{{ data_get($selectedPlacement,'source','type-fallback') }}" data-placement-reason="{{ data_get($selectedPlacement,'reason') }}" data-placement-needs-confirmation="{{ data_get($selectedPlacement,'needs_confirmation',true) ? 'true' : 'false' }}" data-placement-renderable="{{ data_get($selectedPlacement,'renderable',true) ? 'true' : 'false' }}" data-placement-validation="{{ data_get($selectedPlacement,'validation_status','advisory') }}" data-placement-measurement="{{ data_get($selectedPlacement,'measurement_status','measurements-missing') }}" data-placement-basis="{{ data_get($selectedPlacement,'fit_basis','image-estimate') }}" role="slider" tabindex="0" aria-label="Drag left or right to compare the original room and FurniCraft planning preview" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" style="--split:50%; --product-width:40%; --product-x:50%; --product-y:84%; --product-rotation:0deg; --product-perspective:0deg; --product-flip:1;">
-            <img class="comparison-room-base" src="{{ route('room-images.original', $roomImage) }}" alt="Original uploaded room">
-            <div class="comparison-result" data-comparison-result aria-hidden="true">
-                <img class="comparison-room-result" src="{{ $generatedPreview && $selectedProduct ? route('room-images.preview', [$roomImage, $selectedProduct->id]) : route('room-images.original', $roomImage) }}" alt="">
-                @if(!$generatedPreview && $selectedProduct)<img class="comparison-product" src="{{ $selectedProduct->image_url }}" alt="" draggable="false" data-comparison-product>@endif
-                @if(!$generatedPreview && $selectedProduct)<canvas class="comparison-product-warp" data-comparison-product-warp hidden></canvas>@endif
-                @if(!$generatedPreview)<div class="comparison-result-wash"></div>@endif
-            </div>
-            <span class="comparison-tag comparison-tag-original">Original</span>
-            <span class="comparison-tag comparison-tag-result">{{ $generatedWithGemini ? 'Gemini result' : 'Result' }}</span>
-            <span class="comparison-divider" aria-hidden="true"></span>
+                <script type="application/json" data-preview-analysis>@json($roomImage->analysis ?? [])</script>
+        <div class="room-preview-frame" data-room-preview
+            data-room-width="{{ $roomImage->room_width_m }}" data-room-depth="{{ $roomImage->room_depth_m }}"
+            data-product-id="{{ $selectedProduct?->id }}" data-product-name="{{ $selectedProduct?->name }}"
+            data-product-width="{{ $selectedProduct?->width_cm }}" data-product-depth="{{ $selectedProduct?->depth_cm }}" data-product-height="{{ $selectedProduct?->height_cm }}" data-product-dimensions-estimated="{{ $selectedProduct?->dimensions_estimated ? 'true' : 'false' }}"
+            data-product-type="{{ $selectedProduct?->recommendationType() }}" data-product-category="{{ $selectedProduct?->category }}"
+            data-initial-x="{{ data_get($selectedPlacement,'x_percent',50) }}" data-initial-y="{{ data_get($selectedPlacement,'y_percent',86) }}"
+            data-initial-width="{{ data_get($selectedPlacement,'max_width_percent',65) }}" data-initial-quad='@json(data_get($selectedPlacement,"quad_percent"))'
+            data-confidence="{{ data_get($selectedPlacement,'confidence','low') }}" data-placement-source="{{ data_get($selectedPlacement,'source','safe-fallback') }}"
+            data-placement-status="{{ $roomImage->analysis_status }}" data-consented="{{ $roomImage->gemini_consent_at ? 'true' : 'false' }}"
+            data-preview-v2-url="{{ $selectedProduct ? route('room.preview-v2.store', $roomImage) : '' }}"
+            data-verify-url="{{ $selectedProduct ? route('room.preview-verify', [$roomImage,$selectedProduct]) : '' }}"
+            data-csrf="{{ csrf_token() }}">
+            <img class="room-preview-source" src="{{ route('room-images.original', $roomImage) }}" alt="" data-preview-room>
+            @if($selectedProduct)<img class="room-preview-source" src="{{ $selectedProduct->image_url }}" alt="" data-preview-product>@endif
+            <canvas class="room-preview-canvas" data-room-preview-canvas role="img" aria-label="Automatically fitted furniture preview"></canvas>
+            <div class="room-preview-loading" data-preview-loading role="status" aria-live="polite">Uploading · Analyzing room · Fitting furniture · Checking the result</div>
         </div>
+        <div class="preview-detection-row" data-preview-detections aria-live="polite"></div>
+        <div class="room-preview-actions">
+            <button type="button" class="btn btn-primary" data-preview-download>Download preview (PNG)</button>
+            <form method="POST" action="{{ route('room.reanalyze',$roomImage) }}">@csrf<button class="btn btn-outline-secondary" type="submit">Try again</button></form>
+            <a class="btn btn-outline-secondary" href="{{ route('preferences.edit',['room'=>$roomImage->id]) }}#room-preview">Upload another photo</a>
+        </div>
+            <p class="automatic-placement-note">Preview is an estimate, not a measurement. Verify actual dimensions with Lance Furniture Shop before reserving.</p>
 
-        <p class="automatic-placement-note"><strong>Placement validation.</strong> <span data-placement-guidance>{{ data_get($selectedPlacement,'reason','This is a 2D planning estimate.') }}</span> <button class="btn btn-sm btn-outline-primary ms-2" type="button" data-placement-confirm hidden>Choose suggested position</button></p>
 
-        <footer class="comparison-note">
-            <strong>Preview, not a measurement guarantee.</strong>
-            <span>The result is a 2D planning aid. Verify actual room and product dimensions with Lance Furniture Shop before deciding.</span>
-        </footer>
-
-        <details class="room-analysis-details">
-            <summary>View room analysis</summary>
-            <dl><dt>Detected room</dt><dd>{{ data_get($roomImage->analysis,'room_type','Unspecified room') }}</dd><dt>Summary</dt><dd>{{ data_get($roomImage->analysis,'summary') }}</dd><dt>Layout</dt><dd>{{ data_get($roomImage->analysis,'layout') }}</dd><dt>Suggested placement</dt><dd>{{ data_get($roomImage->analysis,'placement_reason','Centered on the visible floor area.') }}</dd><dt>Lighting</dt><dd>{{ data_get($roomImage->analysis,'lighting') }}</dd><dt>Limits</dt><dd>{{ data_get($roomImage->analysis,'constraints') }}</dd></dl>
-        </details>
+        
 
         <div class="d-flex justify-content-end mt-3">
-            @if(auth()->user()->isAdmin())
-                <a class="btn btn-outline-primary" href="{{ route('admin.room-placement-evaluation') }}">Back to accuracy review</a>
-            @else
+            @unless(auth()->user()->isAdmin())
                 <a class="btn btn-outline-primary" href="{{ $recommendation ? route('recommendations.show', $recommendation) : route('preferences.edit', ['room' => $roomImage->id]).'#recommendation-form' }}">{{ $recommendation ? 'Back to recommendations' : 'Use room for recommendations' }}</a>
-            @endif
+            @endunless
         </div>
         <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
             @if($roomImage->gemini_consent_at && !auth()->user()->isAdmin())<form method="POST" action="{{ route('room.ai-consent.revoke', $roomImage) }}" onsubmit="return confirm('Stop future AI processing and delete generated previews for this photo?')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-secondary" type="submit">Turn off AI for this photo</button></form>@endif

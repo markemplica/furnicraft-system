@@ -20,17 +20,17 @@ FurniCraft is a Laravel web application for Lance Furniture Shop. It gives authe
 
 - PHP 8.2 or newer
 - Composer 2
-- MySQL/MariaDB through XAMPP for the intended local deployment
+- A local MySQL or MariaDB server for development and deployment
 - PHP extensions normally enabled by XAMPP for Laravel (`pdo_mysql`, `mbstring`, `openssl`, `fileinfo`)
 - Internet access for Gemini and the Bootstrap CDN
 
-The checked-in local `.env` uses SQLite so the demo works immediately in this workspace. `.env.example` shows the intended MySQL connection but deliberately retains local/debug and log-mail defaults. Neither file represents a production deployment. See [Production deployment and recovery](#production-deployment-and-recovery) before serving real customers.
+This workspace is now configured to use a local MariaDB server on `127.0.0.1:3306`. Existing application records were copied from `database/database.sqlite` into the `furnicraft` MariaDB database; the original SQLite file remains untouched as a fallback copy. The private `.env` uses a dedicated local database account. `.env.example` shows generic XAMPP defaults and retains local/debug and log-mail settings; neither file represents a production deployment. See [Production deployment and recovery](#production-deployment-and-recovery) before serving real customers.
 
-## XAMPP and MySQL setup
+## Local MySQL/MariaDB setup
 
-1. Start Apache and MySQL in the XAMPP Control Panel.
-2. Create a database named `furnicraft` with `utf8mb4` encoding.
-3. Copy `.env.example` to `.env` and confirm these values:
+This workspace already has MariaDB installed as an automatic Windows service, with the `furnicraft` database and a dedicated local app account configured in the private `.env`. Do not replace this workspace’s `.env` with `.env.example`.
+
+For a fresh XAMPP setup, start MySQL in the XAMPP Control Panel, create the `furnicraft` database with `utf8mb4`, then copy `.env.example` to `.env` and configure the values below. Use a dedicated app account for regular use.
 
 ```env
 APP_NAME=FurniCraft
@@ -44,7 +44,7 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
-4. Install and initialize the application:
+Initialize a fresh installation with:
 
 ```powershell
 composer install
@@ -52,19 +52,6 @@ php artisan key:generate
 php artisan migrate --seed
 php artisan storage:link
 ```
-
-For an existing installation, run `php artisan migrate` and then `php artisan room-images:secure-legacy` once to move legacy room photos/previews out of the public storage folder. Room photos are served through authenticated routes after that migration.
-
-5. Start the application and queue worker in separate terminals:
-
-```powershell
-php artisan serve
-php artisan queue:work --tries=3 --timeout=540
-php artisan schedule:work
-```
-
-Open `http://127.0.0.1:8000`.
-
 ## Production deployment and recovery
 
 FurniCraft is currently a locally run prototype. No hosting target, public HTTPS URL, real mail provider, backup destination, restore drill, or supervised production services have been verified. Do not describe the system as production deployed until these steps are completed on the target host.
@@ -150,3 +137,16 @@ The feature suite verifies the login-only access model, required preferences and
 - Room-photo AI processing requires an explicit per-upload opt-in; unconsented images use local guidance only. New photos and generated previews are privately stored, metadata-stripped, and scheduled for removal after `ROOM_IMAGE_RETENTION_DAYS` (default 90).
 - The retention task is scheduled in Laravel. Run `php artisan schedule:work` locally, or configure the standard Laravel scheduler cron entry in production; also run `php artisan room-images:secure-legacy` once after upgrading older installations.
 - The privacy notice describes the application’s controls and external Gemini transfer. It is not a certification or legal compliance determination.
+
+
+
+
+## Automatic 2D room preview
+
+The room preview loads the selected catalog cutout and the uploaded room image into a single static canvas. Gemini analyzes normalized room geometry, openings, scale clues, obstructions, image quality, and lighting. A deterministic client-side placement engine estimates perspective scale, samples safe positions by furniture placement type, and keeps the best result from up to three consented Gemini self-check iterations. Missing catalog dimensions block the preview. Low-quality or uncertain analysis falls back to a rough local estimate with an actionable photo tip; no image is described as an exact measurement.
+
+Room analyses are stored in room_images.analysis and cached by the processed photo SHA-256. Preview iteration history is stored in room_preview_generations.placement_json; reason-code telemetry is recorded in ai_service_events without storing room images. The preview verification endpoint is authenticated, CSRF protected, rate limited, and only accepts requests for an active product with complete dimensions and a photo for which the customer granted Gemini consent.
+
+Run the deterministic geometry unit checks with npm run test:room-preview. The existing Laravel feature suite is run with php artisan test. Gemini settings remain in the existing .env keys GEMINI_API_KEY, GEMINI_MODEL, and GEMINI_FALLBACK_MODEL; the API key is only read by the server.
+
+Known limitations: a single room photo cannot reveal exact depth or hidden obstacles. Perspective and furniture scale remain estimates, product images should be tightly cropped transparent PNG cutouts for the cleanest composite, and room-fit claims must be confirmed against measured dimensions before reserving.

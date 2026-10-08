@@ -10,13 +10,36 @@ class FurnitureProduct extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'slug', 'category', 'description', 'wood_type', 'varnish_finish', 'style', 'price', 'width_cm', 'depth_cm', 'height_cm', 'image_path', 'tags', 'status', 'created_by'];
+    protected $fillable = ['name', 'slug', 'category', 'description', 'wood_type', 'varnish_finish', 'style', 'price', 'width_cm', 'depth_cm', 'height_cm', 'dimensions_estimated', 'image_path', 'tags', 'status', 'created_by'];
 
     protected function casts(): array
     {
-        return ['price' => 'decimal:2', 'tags' => 'array', 'width_cm' => 'decimal:2', 'depth_cm' => 'decimal:2', 'height_cm' => 'decimal:2'];
+        return ['price' => 'decimal:2', 'tags' => 'array', 'width_cm' => 'decimal:2', 'depth_cm' => 'decimal:2', 'height_cm' => 'decimal:2', 'dimensions_estimated' => 'boolean'];
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $product): void {
+            $preserveEstimate = $product->exists
+                && (bool) $product->getOriginal('dimensions_estimated')
+                && ! $product->isDirty(['width_cm', 'depth_cm', 'height_cm']);
+
+            $dimensions = \App\Services\FurnitureDimensionDefaults::resolve(
+                (string) $product->name,
+                (string) $product->category,
+                [
+                    'width_cm' => $product->width_cm,
+                    'depth_cm' => $product->depth_cm,
+                    'height_cm' => $product->height_cm,
+                ],
+            );
+
+            $product->forceFill($dimensions);
+            if ($preserveEstimate) {
+                $product->dimensions_estimated = true;
+            }
+        });
+    }
     public function favorites()
     {
         return $this->hasMany(Favorite::class);

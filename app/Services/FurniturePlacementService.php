@@ -12,14 +12,6 @@ class FurniturePlacementService
         $preferredSurface = $this->preferredSurface($type);
         $measurement = $this->measurementAssessment($product, $roomWidth, $roomDepth, $type);
 
-        if ($measurement['status'] === 'does-not-fit') {
-            return $this->blockedPlacement(
-                $preferredSurface,
-                'does-not-fit',
-                'The catalog dimensions exceed the usable room measurements. Choose a smaller product or verify the room measurements.',
-                $measurement,
-            );
-        }
 
         $zones = collect($analysis['candidate_zones'] ?? [])->filter(fn ($zone) => is_array($zone));
 
@@ -35,7 +27,7 @@ class FurniturePlacementService
             $clearance = $this->percentageValue($zone['clearance_score'] ?? 60);
             $occlusion = $this->percentageValue($zone['occlusion_score'] ?? 20);
             $surfaceScore = $surface === $preferredSurface ? 35 : ($preferredSurface === 'floor' && $surface === 'wall-floor' ? 30 : 0);
-            $typeScore = $suitableTypes->isEmpty() || $suitableTypes->contains($type) ? 25 : 0;
+            $typeScore = $this->zoneSupportsType($suitableTypes->all(), $type) ? 25 : 0;
             $dimensionScore = $this->dimensionScore($product, $roomWidth, $roomDepth, $zone);
             $validFloorAnchor = $this->validFloorAnchor($analysis, $zone, $surface);
             $collision = $this->collidesWithExcludedRegion($analysis, $zone, $product, $roomWidth, $roomDepth, $type);
@@ -52,9 +44,11 @@ class FurniturePlacementService
             $best = $ranked->first();
             $zone = $best['zone'];
             $score = (float) $best['score'];
-            $quad = $this->quad($zone['quad_percent'] ?? $zone['_quad_percent'] ?? null);
+            $quad = str_contains($type, 'door')
+                ? $this->quad($zone['door_fit_quad_percent'] ?? $zone['quad_percent'] ?? $zone['_quad_percent'] ?? null)
+                : null;
             $renderWidth = $this->renderWidth($product, $roomWidth, $zone);
-            $needsConfirmation = $score < 70 || $measurement['status'] !== 'measured-fit';
+            $needsConfirmation = false;
 
             return [
                 'x_percent' => $this->clamp($zone['anchor_x_percent'] ?? 50, 5, 95),
@@ -71,7 +65,7 @@ class FurniturePlacementService
                 'needs_confirmation' => $needsConfirmation,
                 'source' => $zone['_source'] ?? 'candidate-zone',
                 'renderable' => true,
-                'validation_status' => $needsConfirmation ? 'advisory' : 'supported',
+                'validation_status' => ($score < 70 || $measurement['status'] !== 'measured-fit') ? 'advisory' : 'supported',
                 'measurement_status' => $measurement['status'],
                 'fit_basis' => $measurement['status'] === 'measured-fit' ? 'detected-zone-and-room-measurements' : 'detected-zone-only',
                 'validation_messages' => $measurement['messages'],
@@ -92,11 +86,52 @@ class FurniturePlacementService
 
     private function preferredSurface(string $type): string
     {
-        return match (true) {
-            str_contains($type, 'door') => 'opening',
-            str_contains($type, 'cabinet'), str_contains($type, 'bed') => 'wall-floor',
+        return match ($this->furnitureFamily($type)) {
+            'door' => 'opening',
+            'bed', 'storage' => 'wall-floor',
             default => 'floor',
         };
+    }
+
+    private function furnitureFamily(string $type): string
+    {
+        $type = strtolower(trim($type));
+
+        return match (true) {
+            preg_match('/door|doorway|entry|entrance/', $type) === 1 => 'door',
+            preg_match('/dining/', $type) === 1 => 'dining',
+            preg_match('/bed|bunk|double.deck/', $type) === 1 => 'bed',
+            preg_match('/cabinet|wardrobe|dresser|shelf|storage/', $type) === 1 => 'storage',
+            preg_match('/sala|sofa|couch|sectional|living.room/', $type) === 1 => 'living-set',
+            preg_match('/chair|stool|bench|seating/', $type) === 1 => 'seating',
+            preg_match('/table|desk/', $type) === 1 => 'table',
+            default => 'floor',
+        };
+    }
+
+    private function zoneSupportsType(array $suitableTypes, string $type): bool
+    {
+        if ($suitableTypes === []) {
+            return true;
+        }
+
+        $family = $this->furnitureFamily($type);
+
+        foreach ($suitableTypes as $candidate) {
+            $candidate = strtolower(trim((string) $candidate));
+            if ($candidate === '' || $this->furnitureFamily($candidate) === $family) {
+                return true;
+            }
+
+            if ($family === 'living-set' && preg_match('/living|lounge|receiving/', $candidate)) {
+                return true;
+            }
+            if ($family === 'dining' && preg_match('/table|chair|seating/', $candidate)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function dimensionScore(FurnitureProduct $product, ?float $roomWidth, ?float $roomDepth, array $zone): float
@@ -135,23 +170,40 @@ class FurniturePlacementService
     {
         $surface = strtolower(trim((string) ($zone['surface'] ?? 'floor')));
         $suitableTypes = collect($zone['suitable_types'] ?? [])->map(fn ($value) => strtolower(trim((string) $value)));
-        $typeAllowed = $suitableTypes->isEmpty() || $suitableTypes->contains(fn ($candidate) => $candidate === $type || str_contains($candidate, $type) || str_contains($type, $candidate));
+        $typeAllowed = $this->zoneSupportsType($suitableTypes->all(), $type);
 
         if (! $typeAllowed) {
             return false;
         }
 
         if (str_contains($type, 'door')) {
-            return $surface === 'opening' && $this->quad($zone['quad_percent'] ?? $zone['_quad_percent'] ?? null) !== null;
+            return ! $this->isWindowZone($zone)
+                && $surface === 'opening'
+                && $this->quad($zone['door_fit_quad_percent'] ?? $zone['quad_percent'] ?? $zone['_quad_percent'] ?? null) !== null;
         }
 
         if ($surface === 'opening') {
             return false;
         }
 
+        if ($this->furnitureFamily($type) === 'living-set') {
+            return in_array($surface, ['floor', 'wall-floor'], true);
+        }
+
         return $surface === $preferredSurface || ($preferredSurface === 'floor' && $surface === 'wall-floor');
     }
 
+    private function isWindowZone(array $zone): bool
+    {
+        $description = strtolower(implode(' ', array_filter([
+            $zone['label'] ?? null,
+            $zone['opening_label'] ?? null,
+            $zone['region_label'] ?? null,
+            $zone['reason'] ?? null,
+        ], fn ($value) => is_string($value) && trim($value) !== '')));
+
+        return (bool) preg_match('/window|skylight|clerestory|transom|fenestration/', $description);
+    }
     private function validFloorAnchor(array $analysis, array $zone, string $surface): bool
     {
         if (! in_array($surface, ['floor', 'wall-floor'], true) || count($analysis['floor_polygon'] ?? []) < 3) {
@@ -176,7 +228,13 @@ class FurniturePlacementService
         $footprint = [$x - ($width / 2), $y - $depth, $x + ($width / 2), $y];
         $regions = collect($analysis['obstacles'] ?? []);
 
-        if (! str_contains($type, 'door')) {
+        if (str_contains($type, 'door')) {
+            // A door leaf detected inside the doorway is the existing door being
+            // replaced, not a separate obstacle that should force the preview
+            // onto a window or block the doorway entirely.
+            $regions = $regions->reject(fn ($region) => is_array($region)
+                && preg_match('/door[_\s-]*leaf/i', (string) ($region['label'] ?? '')));
+        } else {
             $regions = $regions->concat($analysis['openings'] ?? []);
         }
 
@@ -189,23 +247,32 @@ class FurniturePlacementService
 
     private function renderWidth(FurnitureProduct $product, ?float $roomWidth, array $zone): float
     {
-        $capacity = $this->clamp($zone['max_width_percent'] ?? 65, 15, 90);
+        $capacity = $this->clamp($zone['max_width_percent'] ?? 65, 1, 90);
         if (str_contains(strtolower($product->recommendationType()), 'door')) {
             return $capacity;
         }
-        if ($roomWidth && $product->width_cm) {
-            $measured = ((float) $product->width_cm / ($roomWidth * 100)) * 100;
 
-            return $this->clamp(min($capacity * .96, $measured * 1.08), 10, 90);
+        $catalogWidth = is_numeric($product->width_cm) ? (float) $product->width_cm : null;
+        $roomRelativeWidth = $catalogWidth && $roomWidth
+            ? $catalogWidth / $roomWidth
+            : ($catalogWidth ? $catalogWidth / 3.5 : null);
+
+        if ($roomRelativeWidth !== null) {
+            return $this->clamp(min($capacity * .96, $roomRelativeWidth), 1, 90);
         }
 
-        return $this->clamp($capacity * .78, 12, 90);
+        return $this->clamp($capacity * .72, 1, 90);
     }
 
     private function openingZones(array $analysis): array
     {
         return collect($analysis['openings'] ?? [])->map(function ($opening) {
-            $points = collect(is_array($opening) ? ($opening['polygon'] ?? []) : [])
+            $label = trim((string) ($opening['label'] ?? ''));
+            if ($this->isWindowZone(['label' => $label]) || ! preg_match('/door|doorway|entrance|entry|passage|archway|closet/', strtolower($label))) {
+                return null;
+            }
+
+            $points = collect(is_array($opening) ? ($opening['door_fit_quad_percent'] ?? $opening['polygon'] ?? []) : [])
                 ->filter(fn ($point) => is_array($point) && isset($point[0], $point[1]) && is_numeric($point[0]) && is_numeric($point[1]));
 
             if ($points->count() < 3) {
@@ -220,7 +287,7 @@ class FurniturePlacementService
                 'surface' => 'opening',
                 'anchor_x_percent' => ($minimumX + $maximumX) / 2,
                 'anchor_y_percent' => $maximumY,
-                'max_width_percent' => max(15, $maximumX - $minimumX),
+                'max_width_percent' => max(1, $maximumX - $minimumX),
                 'rotation_deg' => 0,
                 'perspective_deg' => 0,
                 'flip' => false,
@@ -228,7 +295,7 @@ class FurniturePlacementService
                 'clearance_score' => 92,
                 'occlusion_score' => 5,
                 'confidence' => $analysis['scene_confidence'] ?? 'medium',
-                'reason' => 'Aligned to the detected '.trim((string) ($opening['label'] ?? 'door opening')).' frame.',
+                'reason' => 'Aligned to the detected ' . $label . ' frame.',
                 '_source' => 'scene-opening',
                 '_quad_percent' => $this->orderedQuad($points->values()->all()),
             ];
@@ -237,44 +304,78 @@ class FurniturePlacementService
 
     private function fallbackPlacement(array $analysis, string $type, string $surface, array $measurement): array
     {
-        $defaults = match (true) {
-            str_contains($type, 'door') => [88, 76, 24],
-            str_contains($type, 'cabinet') => [70, 88, 36],
-            str_contains($type, 'bed') => [36, 88, 58],
-            str_contains($type, 'sala') => [64, 88, 68],
-            str_contains($type, 'chair') => [42, 87, 28],
+        $defaults = match ($this->furnitureFamily($type)) {
+            'door' => [88, 76, 24],
+            'storage' => [70, 88, 36],
+            'bed' => [36, 88, 58],
+            'living-set' => [64, 88, 68],
+            'seating' => [42, 87, 28],
+            'dining' => [52, 87, 58],
+            'table' => [56, 86, 42],
             default => [56, 86, 48],
         };
 
-        $hasLegacyAnalysis = filled($analysis['placement_x_percent'] ?? null)
-            && filled($analysis['placement_y_percent'] ?? null);
+        $floorFit = $this->fallbackFloorFit($analysis['floor_polygon'] ?? []);
 
         return [
-            'x_percent' => $this->clamp($analysis['placement_x_percent'] ?? $defaults[0], 5, 95),
-            'y_percent' => $this->clamp($analysis['placement_y_percent'] ?? $defaults[1], 30, 96),
-            'max_width_percent' => $this->clamp($analysis['placement_width_percent'] ?? $defaults[2], 15, 90),
-            'rotation_deg' => 0,
+            'x_percent' => $floorFit['x'] ?? $defaults[0],
+            'y_percent' => $floorFit['y'] ?? $defaults[1],
+            'max_width_percent' => $floorFit
+                ? $this->clamp(min($defaults[2], $floorFit['width'] * 0.78), 15, 90)
+                : $this->clamp($defaults[2], 15, 90),            'rotation_deg' => 0,
             'perspective_deg' => 0,
             'flip' => 1,
             'quad_percent' => null,
             'surface' => $surface,
-            'confidence' => $hasLegacyAnalysis ? (string) ($analysis['placement_confidence'] ?? 'low') : 'low',
-            'score' => $hasLegacyAnalysis ? 45 : 30,
-            'reason' => $hasLegacyAnalysis
-                ? (string) ($analysis['placement_reason'] ?? 'Legacy room analysis; confirm the suggested position.')
-                : (str_contains($type, 'door')
-                    ? 'AI doorway detection is temporarily unavailable. A doorway-proportioned fallback was applied; confirm it visually.'
-                    : 'No room zones were detected. Confirm a suitable placement point in the image.'),
-            'needs_confirmation' => true,
-            'source' => $hasLegacyAnalysis ? 'legacy-analysis' : 'type-fallback',
+            'confidence' => 'low',
+            'score' => $floorFit ? 38 : 30,
+            'reason' => $floorFit
+                ? 'Automatically fitted inside the visible floor area detected in this room image. This is a 2D planning estimate; verify actual dimensions.'
+                : 'Automatically placed using a furniture-type layout estimate because no clear floor area was detected. Verify actual dimensions.',
+            'needs_confirmation' => false,
+            'source' => $floorFit ? 'image-floor-fallback' : 'type-fallback',
             'renderable' => true,
             'validation_status' => 'advisory',
             'measurement_status' => $measurement['status'],
-            'fit_basis' => $hasLegacyAnalysis ? 'legacy-image-estimate' : 'furniture-type-fallback',
+            'fit_basis' => $floorFit ? 'detected-floor-area' : 'furniture-type-fallback',
             'validation_messages' => $measurement['messages'],
         ];
     }
 
+    private function fallbackFloorFit(array $polygon): ?array
+    {
+        $points = collect($polygon)->filter(fn ($point) => is_array($point)
+            && isset($point[0], $point[1])
+            && is_numeric($point[0])
+            && is_numeric($point[1]))->values()->all();
+
+        if (count($points) < 3) {
+            return null;
+        }
+
+        $minimumX = max(0, min(array_column($points, 0)));
+        $maximumX = min(100, max(array_column($points, 0)));
+        $minimumY = max(0, min(array_column($points, 1)));
+        $maximumY = min(100, max(array_column($points, 1)));
+        $centerX = ($minimumX + $maximumX) / 2;
+        $targetY = $minimumY + (($maximumY - $minimumY) * 0.78);
+
+        foreach ([0, -0.08, 0.08, -0.16, 0.16, -0.24, 0.24] as $yOffset) {
+            $y = $targetY + (($maximumY - $minimumY) * $yOffset);
+            foreach ([0, -0.1, 0.1, -0.2, 0.2, -0.3, 0.3] as $xOffset) {
+                $x = $centerX + (($maximumX - $minimumX) * $xOffset);
+                if ($this->pointInPolygon($x, $y, $points)) {
+                    return [
+                        'x' => $this->clamp($x, 5, 95),
+                        'y' => $this->clamp($y, 30, 96),
+                        'width' => max(15, $maximumX - $minimumX),
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
     private function blockedPlacement(string $surface, string $status, string $reason, array $measurement): array
     {
         return [

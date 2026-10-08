@@ -16,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Throwable;
+use Illuminate\Support\Facades\DB;
 
 class GenerateRoomPreview implements ShouldQueue, ShouldBeUnique
 {
@@ -64,33 +65,30 @@ class GenerateRoomPreview implements ShouldQueue, ShouldBeUnique
                 return;
             }
 
-            if (! $room->fresh()->gemini_consent_at) {
-                $generation->update(['status' => 'cancelled', 'message' => 'AI processing was disabled before the image could be saved.']);
-                return;
-            }
+            DB::transaction(function () use ($room, $product, $generation, $result, $photos) {
+                $current = RoomImage::whereKey($room->id)->lockForUpdate()->first();
+                if (! $current || ! $current->gemini_consent_at) {
+                    $generation->update(['status' => 'cancelled', 'message' => 'AI processing was disabled before the image could be saved.']);
+                    return;
+                }
 
-            $extension = match ($result['mime_type']) {
-                'image/jpeg', 'image/jpg' => 'jpg',
-                'image/webp' => 'webp',
-                default => 'png',
-            };
-            $path = 'rooms/'.$room->user_id.'/previews/room-'.$room->id.'-product-'.$product->id.'-'.$product->updated_at->timestamp.'.'.$extension;
-            $photos->storeGenerated($path, $result['bytes']);
+                $extension = match ($result['mime_type']) {
+                    'image/jpeg', 'image/jpg' => 'jpg',
+                    'image/webp' => 'webp',
+                    default => 'png',
+                };
+                $path = 'rooms/'.$current->user_id.'/previews/room-'.$current->id.'-product-'.$product->id.'-'.$product->updated_at->timestamp.'.'.$extension;
+                $photos->storeGenerated($path, $result['bytes']);
 
-            if (! $room->fresh()->gemini_consent_at) {
-                $photos->deleteGenerated($path);
-                $generation->update(['status' => 'cancelled', 'message' => 'AI processing was disabled before the image could be saved.']);
-                return;
-            }
-
-            $analysis = $room->fresh()->analysis ?? [];
-            $analysis['generated_previews'][(string) $product->id] = [
-                'path' => $path,
-                'gemini_used' => true,
-                'generated_at' => now()->toIso8601String(),
-            ];
-            $room->fresh()->update(['analysis' => $analysis]);
-            $generation->update(['status' => 'completed', 'message' => 'Generated room preview is ready.']);
+                $analysis = $current->analysis ?? [];
+                $analysis['generated_previews'][(string) $product->id] = [
+                    'path' => $path,
+                    'gemini_used' => true,
+                    'generated_at' => now()->toIso8601String(),
+                ];
+                $current->update(['analysis' => $analysis]);
+                $generation->update(['status' => 'completed', 'message' => 'Generated room preview is ready.']);
+            });
         } catch (Throwable $exception) {
             if ($this->attempts() >= $this->tries) {
                 $telemetry->record('image', 'furnished_preview', 'fallback', fallbackUsed: true, failureCode: $telemetry->failureCode($exception));

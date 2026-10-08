@@ -9,3 +9,8 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('room-images:prune')->daily();
+
+Schedule::command('reservations:expire')->hourly();
+Schedule::command('reservations:remind')->hourly();
+
+

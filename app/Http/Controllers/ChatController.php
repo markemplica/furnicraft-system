@@ -20,7 +20,7 @@ class ChatController extends Controller
 
         $notice = match ($source) {
             'local-fallback' => 'Gemini is temporarily unavailable. FurniCraft replied using local catalog guidance.',
-            'catalog-rule' => 'FurniCraft replied using current catalog listings. Physical branch stock still needs confirmation.',
+            'catalog-rule' => 'FurniCraft replied using current catalog listings. Physical availability still needs confirmation with Lance Furniture Shop.',
             default => 'FurniCraft replied to your question.',
         };
 

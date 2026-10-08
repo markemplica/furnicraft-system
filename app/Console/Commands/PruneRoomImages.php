@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\RoomImage;
+use App\Models\RoomPreviewAnalysis;
 use App\Services\PrivacyAudit;
 use App\Services\RoomPhotoService;
 use Illuminate\Console\Command;
@@ -15,7 +16,7 @@ class PruneRoomImages extends Command
 
     public function handle(RoomPhotoService $photos, PrivacyAudit $audit): int
     {
-        $days = max(1, (int) config('privacy.room_image_retention_days', 90));
+        $days = max(1, (int) config('privacy.room_image_retention_days', config('roompreview.retention_days', 30)));
         $deleted = 0;
         RoomImage::where('created_at', '<', now()->subDays($days))->orderBy('id')->chunkById(100, function ($rooms) use ($photos, $audit, &$deleted): void {
             foreach ($rooms as $room) {
@@ -27,7 +28,8 @@ class PruneRoomImages extends Command
                 $deleted++;
             }
         });
-        $this->info("Deleted {$deleted} room records older than {$days} days.");
+        $analysisRows = RoomPreviewAnalysis::where('updated_at', '<', now()->subDays($days))->delete();
+        $this->info("Deleted {$deleted} room records and {$analysisRows} shared room analyses older than {$days} days.");
 
         return self::SUCCESS;
     }

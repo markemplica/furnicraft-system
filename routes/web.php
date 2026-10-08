@@ -13,10 +13,11 @@ use App\Http\Controllers\PreferenceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\RecommendationFeedbackController;
-use App\Http\Controllers\SystemUsabilityController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\RoomController;
+use App\Http\Controllers\RoomPreviewV2Controller;
 use App\Http\Controllers\RoomPhotoController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'index'])->name('home');
@@ -28,12 +29,25 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login.store')->middleware('throttle:10,1');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->name('register.store')->middleware('throttle:5,1');
+    Route::get('/verify-email', [AuthController::class, 'showVerification'])->name('verification.notice');
+    Route::post('/verify-email', [AuthController::class, 'verifyEmail'])->name('verification.verify')->middleware('throttle:8,1');
+    Route::post('/verify-email/resend', [AuthController::class, 'resendVerificationCode'])->name('verification.send')->middleware('throttle:3,1');
     Route::get('/forgot-password', [PasswordResetController::class, 'showRequest'])->name('password.request');
     Route::post('/forgot-password', [PasswordResetController::class, 'sendCode'])->name('password.email')->middleware('throttle:3,1');
     Route::get('/reset-password', [PasswordResetController::class, 'showReset'])->name('password.reset');
+    Route::post('/reset-password/resend', [PasswordResetController::class, 'resendCode'])->name('password.resend')->middleware('throttle:3,1');
     Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.update')->middleware('throttle:8,1');
 });
 Route::middleware('auth')->group(function () {
+    Route::get('/reservations', function (Request $request) {
+        if ($request->user()->isAdmin()) {
+            return redirect()->route('admin.reservations.index');
+        }
+
+        abort_unless($request->user()->role === 'customer', 403);
+
+        return app(ReservationController::class)->index($request);
+    })->name('reservations.index');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/room-images/{roomImage}', [RoomPhotoController::class, 'original'])->name('room-images.original');
     Route::get('/room-images/{roomImage}/previews/{product}', [RoomPhotoController::class, 'preview'])->whereNumber('product')->name('room-images.preview');
@@ -51,20 +65,22 @@ Route::middleware('auth')->group(function () {
         Route::post('/preferences', [PreferenceController::class, 'update'])->name('preferences.update');
         Route::post('/recommendations', [RecommendationController::class, 'store'])->name('recommendations.store');
         Route::get('/recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
-        Route::get('/system-usability', [SystemUsabilityController::class, 'edit'])->name('usability.edit');
-        Route::post('/system-usability', [SystemUsabilityController::class, 'store'])->name('usability.store');
         Route::get('/recommendations/{recommendation}', [RecommendationController::class, 'show'])->name('recommendations.show');
         Route::post('/recommendations/{recommendation}/items/{recommendationItem}/feedback', [RecommendationFeedbackController::class, 'update'])->name('recommendations.items.feedback');
         Route::post('/recommendations/{recommendation}/chat', [ChatController::class, 'store'])->name('recommendations.chat');
         Route::get('/room', [RoomController::class, 'index'])->name('room.index');
-        Route::post('/room', [RoomController::class, 'store'])->name('room.store');
+        Route::post('/room', [RoomController::class, 'store'])->name('room.store')->middleware('throttle:10,60');
         Route::delete('/room/{roomImage}', [RoomController::class, 'destroy'])->name('room.destroy');
         Route::delete('/room/{roomImage}/ai-consent', [RoomController::class, 'revokeAiConsent'])->name('room.ai-consent.revoke');
         Route::get('/room/{roomImage}/visualize', [RoomController::class, 'visualize'])->name('room.visualize');
         Route::get('/room/{roomImage}/analysis-status', [RoomController::class, 'analysisStatus'])->name('room.analysis-status');
+        Route::post('/room/{roomImage}/preview-verify/{product}', [RoomController::class, 'verifyPreview'])->whereNumber('product')->name('room.preview-verify')->middleware('throttle:15,1');
         Route::get('/room/{roomImage}/preview-status/{product}', [RoomController::class, 'previewStatus'])->whereNumber('product')->name('room.preview-status');
         Route::post('/room/{roomImage}/reanalyze', [RoomController::class, 'reanalyze'])->name('room.reanalyze')->middleware('throttle:3,1');
-        Route::get('/reservations', [ReservationController::class, 'index'])->name('reservations.index');
+        Route::post('/room/{roomImage}/preview-v2', [RoomPreviewV2Controller::class, 'store'])->name('room.preview-v2.store')->middleware('throttle:10,60');
+        Route::get('/room/{roomImage}/preview-v2/{generation}', [RoomPreviewV2Controller::class, 'status'])->whereNumber('generation')->name('room.preview-v2.status')->middleware('throttle:60,1');
+        Route::get('/room-preview-v2/artifacts/{generation}', [RoomPreviewV2Controller::class, 'artifact'])->whereNumber('generation')->middleware('signed')->name('room.preview-v2.artifact');
+
         Route::post('/reservations', [ReservationController::class, 'store'])->name('reservations.store');
         Route::patch('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('reservations.cancel');
     });
@@ -72,19 +88,15 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::resource('products', AdminProductController::class)->except('show');
+        Route::patch('/products/{product}/status', [AdminProductController::class, 'updateStatus'])->name('products.status');
+        Route::delete('/products/{product}/permanently', [AdminProductController::class, 'destroyPermanently'])->name('products.destroy-permanently');
         Route::get('/customers', [AdminCustomerController::class, 'index'])->name('customers.index');
         Route::patch('/customers/{user}', [AdminCustomerController::class, 'update'])->name('customers.update');
         Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index');
         Route::get('/reports', [App\Http\Controllers\Admin\ReportsController::class, 'index'])->name('reports.index');
         Route::get('/reports/export', [App\Http\Controllers\Admin\ReportsController::class, 'export'])->name('reports.export');
         Route::get('/recommendation-evaluation', [App\Http\Controllers\Admin\RecommendationEvaluationController::class, 'index'])->name('recommendation-evaluation');
-        Route::get('/system-usability-results', [App\Http\Controllers\Admin\UsabilityResultsController::class, 'index'])->name('system-usability-results');
         Route::get('/privacy-audit', [App\Http\Controllers\Admin\PrivacyAuditController::class, 'index'])->name('privacy-audit');
-        Route::get('/ai-service-health', [App\Http\Controllers\Admin\AiServiceHealthController::class, 'index'])->name('ai-service-health');
-        Route::get('/deployment-readiness', [App\Http\Controllers\Admin\ProductionReadinessController::class, 'index'])->name('deployment-readiness');
-        Route::get('/room-placement-evaluation', [App\Http\Controllers\Admin\RoomPlacementEvaluationController::class, 'index'])->name('room-placement-evaluation');
-        Route::post('/room-placement-evaluation/{roomImage}', [App\Http\Controllers\Admin\RoomPlacementEvaluationController::class, 'store'])->name('room-placement-evaluation.store');
-        Route::get('/room-placement-evaluation/{roomImage}/preview', [RoomController::class, 'visualize'])->name('room-placement-evaluation.preview');
         Route::patch('/reservations/{reservation}', [AdminReservationController::class, 'update'])->name('reservations.update');
     });
 });
